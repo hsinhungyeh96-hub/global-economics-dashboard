@@ -1,228 +1,330 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import urllib.request
-import json
+import requests
 import plotly.express as px
 import xml.etree.ElementTree as ET
-import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 
-# 基礎網頁設定
-st.set_page_config(page_title="全球自動化經濟儀表板", layout="wide")
-st.title("🌐 全球核心國家經濟數據全自動 Dashboard")
-st.write(f"📊 本地偵測時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-st.write("📡 數據來源：世界銀行 (Macro) ＋ 雅虎財經 (實時匯率) ＋ Google News (各國專屬新聞) 原生解析")
+# =========================================================
+# 🌐 基礎設定
+# =========================================================
+st.set_page_config(
+    page_title="全球自動化經濟儀表板 Pro",
+    layout="wide"
+)
 
-# ================= 1. 輔助函數：雅虎財經實時匯率抓取 =================
-def get_fx_rate(currency_code):
-    """直連 Yahoo Finance 抓取貨幣對美元的即時匯率"""
-    if currency_code == "USD":
-        return 1.0
+st.title("🌍 全球核心經濟 Dashboard Pro")
+st.caption("資料來源：FRED + ExchangeRate.host + Google News RSS")
+
+# ⚠️ 正式部署時請改用 Streamlit secrets 或環境變數
+FRED_API_KEY = st.secrets.get("FRED_API_KEY", "")
+
+# =========================================================
+# 🌐 國家設定
+# =========================================================
+COUNTRY_CONFIG = {
+    "USA": {
+        "名稱": "美國",
+        "貨幣": "USD",
+        "失業率": "UNRATE",
+        "CPI": "CPIAUCSL",
+        "GDP": "A191RL1Q225SBEA",
+        "新聞": "United States economy"
+    },
+    "DEU": {
+        "名稱": "德國 / 歐元區",
+        "貨幣": "EUR",
+        "失業率": "LRHUTTTTEM156S",
+        "CPI": "CP0000EZ19M086NEST",
+        "GDP": "CLVMEURSCAB1GQEA",
+        "新聞": "Germany economy"
+    },
+    "JPN": {
+        "名稱": "日本",
+        "貨幣": "JPY",
+        "失業率": "JPNURMQSDSMEI",
+        "CPI": "JPNCPIALLMINMEI",
+        "GDP": "JPNRGDPQDSMEI",
+        "新聞": "Japan economy"
+    },
+    "TWN": {
+        "名稱": "台灣",
+        "貨幣": "TWD",
+        "失業率": "TWNURM",
+        "CPI": "TWNCPIALLMINMEI",
+        "GDP": "TWNRGDPQDSMEI",
+        "新聞": "Taiwan economy"
+    }
+}
+
+# =========================================================
+# 🔧 Session
+# =========================================================
+session = requests.Session()
+session.headers.update({
+    "User-Agent": "Mozilla/5.0"
+})
+
+# =========================================================
+# 📦 FRED API
+# =========================================================
+@st.cache_data(ttl=1800)
+def fetch_fred_series(series_id, limit=24):
+
+    if not FRED_API_KEY:
+        return []
+
     try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{currency_code}=X"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode())
-            meta = data['chart']['result'][0]['meta']
-            rate = meta['regularMarketPrice']
-            return float(rate)
-    except Exception:
-        fallbacks = {"EUR": 0.92, "JPY": 155.2, "GBP": 0.79, "AUD": 1.51, "INR": 83.4, "BRA": 5.15, "ZAF": 18.5, "IDN": 16000.0, "ARE": 3.67, "RUB": 91.0, "SGP": 1.35, "TWN": 32.3}
-        return fallbacks.get(currency_code, None)
+        url = "https://api.stlouisfed.org/fred/series/observations"
 
-# ================= 2. 輔助函數：各國專屬財經新聞抓取 (動態搜尋) =================
-def get_country_specific_news(country_name):
-    """根據選定的國家名稱，動態向 Google News RSS 搜尋最新精選財經新聞"""
-    news_list = []
-    try:
-        # 💡 將國家名稱加上財經關鍵字，並進行網頁安全編碼 (URL Encode)
-        query = f"{country_name} 財經 經濟"
-        encoded_query = urllib.parse.quote(query)
-        
-        # 使用 Google News 搜尋型 RSS 接口，精準撈取該國新聞
-        url = f"https://news.google.com/rss/search?q={encoded_query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        params = {
+            "series_id": series_id,
+            "api_key": FRED_API_KEY,
+            "file_type": "json",
+            "sort_order": "desc",
+            "limit": limit
         }
-        
-        import ssl
-        ssl_context = ssl._create_unverified_context()
-        
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, context=ssl_context, timeout=8) as response:
-            xml_data = response.read()
-            
-        root = ET.fromstring(xml_data)
-        for item in root.findall('.//item')[:6]: # 嚴格限制 6 條，秒開防過載
-            title = item.find('title').text
-            link = item.find('link').text
-            pub_date = item.find('pubDate').text
-            try:
-                date_parsed = datetime.datetime.strptime(pub_date, '%a, %d %b %Y %H:%M:%S %Z').strftime('%Y-%m-%d %H:%M')
-            except:
-                date_parsed = pub_date[:16]
-            news_list.append({"時間": date_parsed, "新聞標題": title, "連結": link})
-            
-    except Exception as ne:
-        news_list.append({"時間": "📡 提示", "新聞標題": f"暫時無法取得 {country_name} 新聞，請稍候重試。({str(ne)})", "連結": "#"})
-        
-    if not news_list:
-        news_list.append({"時間": "📡 提示", "新聞標題": f"目前暫無 {country_name} 的即時重大經貿新聞。", "連結": "#"})
-    return news_list
 
-# ================= 3. 原生 API 數據大融合 =================
-@st.cache_data(ttl=1800) # 快取 30 分鐘
-def get_combined_global_data():
-    country_codes = ["USA", "DEU", "JPN", "GBR", "AUS", "IND", "BRA", "ZAF", "IDN", "ARE", "RUS", "SGP", "TWN"]
-    countries_str = ";".join(country_codes)
-    
-    metrics = {
-        "GDP 年增率 (%)": "NY.GDP.MKTP.KD.ZG",
-        "通貨膨脹率 (CPI %)": "FP.CPI.TOTL.ZG",
-        "失業率 (%)": "SL.UEM.TOTL.ZS"
-    }
-    
-    wb_id_mapping = {
-        "US": {"中文": "美國 (USA)", "三字碼": "USA", "貨幣": "USD"},
-        "DE": {"中文": "歐元區/德國 (DEU)", "三字碼": "DEU", "貨幣": "EUR"},
-        "JP": {"中文": "日本 (JPN)", "三字碼": "JPN", "貨幣": "JPY"},
-        "GB": {"中文": "英國 (GBR)", "三字碼": "GBR", "貨幣": "GBP"},
-        "AU": {"中文": "澳洲 (AUS)", "三字碼": "AUS", "貨幣": "AUD"},
-        "IN": {"中文": "印度 (IND)", "三字碼": "IND", "貨幣": "INR"},
-        "BR": {"中文": "巴西 (BRA)", "三字碼": "BRA", "貨幣": "BRL"},
-        "ZA": {"中文": "南非 (ZAF)", "三字碼": "ZAF", "貨幣": "ZAR"},
-        "ID": {"中文": "印尼 (IDN)", "三字碼": "IDN", "貨幣": "IDR"},
-        "AE": {"中文": "阿聯酋/杜拜 (ARE)", "三字碼": "ARE", "貨幣": "AED"},
-        "RU": {"中文": "俄羅斯 (RUS)", "三字碼": "RUS", "貨幣": "RUB"},
-        "SG": {"中文": "新加坡 (SGP)", "三字碼": "SGP", "貨幣": "SGD"},
-        "TW": {"中文": "台灣 (TWN)", "三字碼": "TWN", "貨幣": "TWD"}
-    }
-    
-    final_df = pd.DataFrame({"國家代碼": country_codes})
-    final_df["國家"] = final_df["國家代碼"].map({v["三字碼"]: v["中文"] for k, v in wb_id_mapping.items()})
-    final_df["資料狀態"] = "🟢 數據與實時匯率全線同步"
-    
+        response = session.get(url, params=params, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+
+        observations = data.get("observations", [])
+
+        cleaned = []
+
+        for obs in observations:
+            value = obs.get("value")
+
+            if value != ".":
+                cleaned.append(float(value))
+
+        return cleaned
+
+    except Exception as e:
+        st.warning(f"FRED 抓取失敗：{series_id} ({e})")
+        return []
+
+
+# =========================================================
+# 📈 計算 CPI 年增率
+# =========================================================
+def calculate_yoy_inflation(values):
+
+    if len(values) < 13:
+        return None
+
+    latest = values[0]
+    last_year = values[12]
+
     try:
-        for metric_name, metric_id in metrics.items():
-            url = f"http://api.worldbank.org/v2/country/{countries_str}/indicator/{metric_id}?format=json&per_page=1000"
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req) as response:
-                raw_json = json.loads(response.read().decode())
-                
-            data_list = raw_json[1] if len(raw_json) > 1 else []
-            parsed_rows = []
-            for item in data_list:
-                raw_id = item['country']['id'].upper()
-                year = int(item['date'])
-                val = item['value']
-                
-                if val is not None and raw_id in wb_id_mapping:
-                    c_code = wb_id_mapping[raw_id]["三字碼"]
-                    parsed_rows.append({"國家代碼": c_code, "年份": year, "數值": val})
-            
-            if parsed_rows:
-                df_metric = pd.DataFrame(parsed_rows)
-                df_latest = df_metric.sort_values("年份").groupby("國家代碼").last().reset_index()
-                df_latest = df_latest.rename(columns={"數值": metric_name})
-                final_df = pd.merge(final_df, df_latest[["國家代碼", metric_name]], on="國家代碼", how="left")
-                
-        if final_df.loc[final_df['國家代碼'] == 'TWN', 'GDP 年增率 (%)'].isnull().any():
-            final_df.loc[final_df['國家代碼'] == 'TWN', ['GDP 年增率 (%)', '通貨膨脹率 (CPI %)', '失業率 (%)']] = [3.81, 1.95, 3.42]
-            final_df.loc[final_df['國家代碼'] == 'TWN', '資料狀態'] = "🟡 匯率實時/總經主計處基準"
+        yoy = ((latest / last_year) - 1) * 100
+        return round(yoy, 2)
+    except:
+        return None
 
-    except Exception:
-        pass
 
-    fx_rates = []
-    for code in country_codes:
-        curr = next((v["貨幣"] for k, v in wb_id_mapping.items() if v["三字碼"] == code), "USD")
-        rate = get_fx_rate(curr)
-        fx_rates.append({"國家代碼": code, "兌美元匯率 (FX)": rate, "貨幣": curr})
-        
-    df_fx = pd.DataFrame(fx_rates)
-    final_df = pd.merge(final_df, df_fx, on="國家代碼", how="left")
+# =========================================================
+# 💱 匯率 API
+# =========================================================
+@st.cache_data(ttl=1800)
+def get_fx_rate(base_currency):
 
-    for col in ["GDP 年增率 (%)", "通貨膨脹率 (CPI %)", "失業率 (%)", "兌美元匯率 (FX)"]:
-        final_df[col] = pd.to_numeric(final_df[col], errors='coerce').round(2)
-        
-    return final_df[["國家", "國家代碼", "貨幣", "兌美元匯率 (FX)", "GDP 年增率 (%)", "通貨膨脹率 (CPI %)", "失業率 (%)", "資料狀態"]]
+    if base_currency == "USD":
+        return 1.0
 
-df = get_combined_global_data()
-
-# ================= 4. 渲染前端介面 =================
-st.header("📋 全球大盤實時數據中心")
-
-if df is not None and not df.empty:
-    # ✨ 1. 核心數據表格 (最上方)
-    st.subheader("📊 核心數據一覽表")
-    st.dataframe(
-        df, 
-        hide_index=True, 
-        column_config={
-            "國家代碼": None,
-            "資料狀態": st.column_config.TextColumn("資料來源與狀態", width="medium"),
-            "兌美元匯率 (FX)": st.column_config.NumberColumn("兌美元匯率 (FX)")
-        }, 
-        use_container_width=True
-    )
-    
-    st.markdown("---")
-    
-    # ✨ 2. 國家專屬即時新聞區塊 (中間) - 徹底修復「少了很多國家」的問題！
-    st.subheader("📰 各國即時定向財經新聞中心")
-    
-    # 提取所有可選國家清單
-    available_countries = [c.split(" ")[0] for c in df["國家"].tolist()] # 拿掉括號，只保留 "美國", "日本", "台灣" 等乾淨字眼
-    
-    # 新聞專用的國家切換下拉選單
-    selected_news_country = st.selectbox("🎯 請選擇你想查看的經貿新聞國家：", available_countries, index=0)
-    
-    # 動態向雲端獲取該國新聞
-    news_data = get_country_specific_news(selected_news_country)
-    
-    col1, col2 = st.columns(2)
-    for idx, item in enumerate(news_data):
-        target_col = col1 if idx % 2 == 0 else col2
-        with target_col:
-            st.markdown(f"**⏱️ {item['時間']}** ── [{item['新聞標題']}]({item['連結']})")
-            
-    st.markdown("---")
-    
-    # ✨ 3. 互動地圖 (最下方)
-    st.subheader("🗺️ 全球動態互動地圖")
-    target_metric = st.selectbox(
-        "選擇地圖著色指標：", 
-        ["GDP 年增率 (%)", "通貨膨脹率 (CPI %)", "失業率 (%)", "兌美元匯率 (FX)"]
-    )
-    
     try:
-        fig = px.choropleth(
-            df,
-            locations="國家代碼",
-            color=target_metric,
-            hover_name="國家",
-            hover_data={
-                "國家代碼": False,
-                "貨幣": True,
-                "兌美元匯率 (FX)": ":.2f",
-                "GDP 年增率 (%)": ":.2f",
-                "通貨膨脹率 (CPI %)": ":.2f",
-                "失業率 (%)": ":.2f",
-                "資料狀態": True
-            },
-            color_continuous_scale=px.colors.sequential.YlGnBu, 
-            projection="natural earth"
+        url = f"https://api.frankfurter.app/latest?from=USD&to={base_currency}"
+
+        response = session.get(url, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+
+        rate = data["rates"][base_currency]
+
+        return round(rate, 4)
+
+    except:
+        return None
+
+
+# =========================================================
+# 📰 新聞 RSS
+# =========================================================
+@st.cache_data(ttl=1800)
+def get_country_news(keyword):
+
+    try:
+        rss_url = (
+            f"https://news.google.com/rss/search?"
+            f"q={keyword}&hl=en-US&gl=US&ceid=US:en"
         )
-        fig.update_layout(
-            margin={"r":0,"t":30,"l":0,"b":0},
-            geo=dict(
-                showframe=False, showcoastlines=True, showland=True,
-                landcolor="rgba(235, 235, 235, 0.7)", projection_type='equirectangular'
+
+        response = session.get(rss_url, timeout=10)
+        response.raise_for_status()
+
+        root = ET.fromstring(response.content)
+
+        news = []
+
+        for item in root.findall(".//item")[:5]:
+
+            title = item.find("title").text
+            link = item.find("link").text
+            pub_date = item.find("pubDate").text
+
+            news.append({
+                "title": title,
+                "link": link,
+                "date": pub_date[:16]
+            })
+
+        return news
+
+    except Exception as e:
+        return [{
+            "title": f"新聞讀取失敗：{e}",
+            "link": "#",
+            "date": "ERROR"
+        }]
+
+
+# =========================================================
+# 🌍 單一國家資料抓取
+# =========================================================
+def fetch_country_data(country_code, info):
+
+    unemployment_data = fetch_fred_series(info["失業率"], 1)
+    cpi_data = fetch_fred_series(info["CPI"], 24)
+    gdp_data = fetch_fred_series(info["GDP"], 1)
+
+    unemployment = unemployment_data[0] if unemployment_data else None
+    inflation = calculate_yoy_inflation(cpi_data)
+    gdp = gdp_data[0] if gdp_data else None
+    fx = get_fx_rate(info["貨幣"])
+
+    return {
+        "國家代碼": country_code,
+        "國家": info["名稱"],
+        "貨幣": info["貨幣"],
+        "GDP 成長率 (%)": gdp,
+        "通膨率 YoY (%)": inflation,
+        "失業率 (%)": unemployment,
+        "USD FX": fx
+    }
+
+
+# =========================================================
+# ⚡ 平行抓取全球資料
+# =========================================================
+@st.cache_data(ttl=1800)
+def build_global_dataset():
+
+    rows = []
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+
+        futures = []
+
+        for code, info in COUNTRY_CONFIG.items():
+            futures.append(
+                executor.submit(fetch_country_data, code, info)
             )
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    except Exception as map_err:
-        st.error(f"地圖渲染失敗: {map_err}")
-else:
-    st.warning("⚠️ 無法載入經濟數據。")
+
+        for future in futures:
+            rows.append(future.result())
+
+    df = pd.DataFrame(rows)
+
+    numeric_cols = [
+        "GDP 成長率 (%)",
+        "通膨率 YoY (%)",
+        "失業率 (%)",
+        "USD FX"
+    ]
+
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce").round(2)
+
+    return df
+
+
+# =========================================================
+# 📊 主資料表
+# =========================================================
+st.header("📊 全球即時經濟總覽")
+
+with st.spinner("同步全球經濟數據中..."):
+    df = build_global_dataset()
+
+st.dataframe(
+    df,
+    hide_index=True,
+    use_container_width=True
+)
+
+# =========================================================
+# 🗺️ 全球地圖
+# =========================================================
+st.header("🗺️ 全球經濟熱力地圖")
+
+metric = st.selectbox(
+    "選擇觀察指標",
+    [
+        "GDP 成長率 (%)",
+        "通膨率 YoY (%)",
+        "失業率 (%)",
+        "USD FX"
+    ]
+)
+
+fig = px.choropleth(
+    df,
+    locations="國家代碼",
+    color=metric,
+    hover_name="國家",
+    projection="natural earth",
+    color_continuous_scale="Blues"
+)
+
+fig.update_layout(
+    margin={"r": 0, "t": 20, "l": 0, "b": 0}
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# =========================================================
+# 📰 新聞區
+# =========================================================
+st.header("📰 全球財經新聞")
+
+tabs = st.tabs([
+    info["名稱"] for info in COUNTRY_CONFIG.values()
+])
+
+for tab, (_, info) in zip(tabs, COUNTRY_CONFIG.items()):
+
+    with tab:
+
+        news_items = get_country_news(info["新聞"])
+
+        for news in news_items:
+
+            st.markdown(
+                f"""
+                ### [{news['title']}]({news['link']})
+
+                ⏱️ {news['date']}
+                """
+            )
+
+# =========================================================
+# 📌 Footer
+# =========================================================
+st.markdown("---")
+st.caption(
+    f"最後更新時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+)
