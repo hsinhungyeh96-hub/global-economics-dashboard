@@ -31,28 +31,37 @@ def get_fx_rate(currency_code):
 
 # ================= 2. 輔助函數：全球即時財經新聞抓取 (免 Key 原生解析) =================
 def get_global_financial_news():
-    """從 Google News 財經 RSS 抓取最新全球市場動態"""
+    """從 Google News 財經 RSS 抓取最新全球市場動態 (加強反爬蟲偽裝)"""
     news_list = []
     try:
-        # 使用 Google News 國際財經商業版 RSS
         url = "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRW9JT0wyY3vNTVmMTlhbWptbEhzZ0pVUndvR0FBUAE?hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
+        
+        # 💡 核心升級：加入完整瀏覽器特徵標頭，徹底繞過 Google 機器人阻擋
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Referer': 'https://news.google.com/'
+        }
+        
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as response: # 微調超時時間至 8 秒防止斷線
             xml_data = response.read()
             
         root = ET.fromstring(xml_data)
-        for item in root.findall('.//item')[:6]: # 限制只抓最新 6 條，確保加載速度極速、完全不負載
+        for item in root.findall('.//item')[:6]:
             title = item.find('title').text
             link = item.find('link').text
             pub_date = item.find('pubDate').text
-            # 簡化時間格式
             try:
                 date_parsed = datetime.datetime.strptime(pub_date, '%a, %d %b %Y %H:%M:%S %Z').strftime('%Y-%m-%d %H:%M')
             except:
                 date_parsed = pub_date[:16]
             news_list.append({"時間": date_parsed, "新聞標題": title, "連結": link})
+            
     except Exception as ne:
-        news_list.append({"時間": "📡", "新聞標題": "即時新聞連線稍微延遲，請重新整理網頁。", "連結": "#"})
+        # 顯示更詳細的工程偵錯訊息
+        news_list.append({"時間": "📡 提示", "新聞標題": f"Google 新聞雲端阻擋中，請稍候點擊下方『同步最新新聞』按鈕重試。({str(ne)})", "連結": "#"})
     return news_list
 
 # ================= 3. 原生 API 數據大融合 =================
@@ -156,18 +165,20 @@ if df is not None and not df.empty:
     
     st.markdown("---")
     
-    # ✨ 需求 2：即時財經新聞區塊 (插入在中間)
+ # ✨ 新聞區塊 (新增動態手動重新整理按鈕，不影響主表格)
     st.subheader("📰 全球即時財經精選新聞")
+    
+    # 點擊此按鈕會清除該新聞函數的快取，強行向 Google 刷新
+    if st.button("🔄 同步最新新聞"):
+        st.cache_data.clear()
+        
     news_data = get_global_financial_news()
     
-    # 用乾淨的兩欄式卡片排版，完全不占空間也不耗資源
     col1, col2 = st.columns(2)
     for idx, item in enumerate(news_data):
         target_col = col1 if idx % 2 == 0 else col2
         with target_col:
             st.markdown(f"**⏱️ {item['時間']}** ── [{item['新聞標題']}]({item['連結']})")
-            
-    st.markdown("---")
     
     # ✨ 需求 1：地圖移到最下方
     st.subheader("🗺️ 全球動態互動地圖")
