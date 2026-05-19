@@ -7,229 +7,102 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 
 # =========================================================
-# 🌍 基礎設定
+# 🌍 基本設定
 # =========================================================
 st.set_page_config(
     page_title="Global Macro Dashboard Pro",
     layout="wide"
 )
 
-st.title("🌐 全球總體經濟 Dashboard Pro")
-st.caption("資料來源：FRED + Frankfurter FX + Google News RSS")
+st.title("🌐 Global Macro Intelligence Dashboard")
+st.caption("FRED + FX + Stock + Manual Override Layer")
 
 st.write(
-    f"⏰ 最後更新時間： "
-    f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    f"⏰ 更新時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 )
 
-# ⚠️ 練習可直接寫死，但正式專案建議用 secrets
 FRED_API_KEY = st.secrets.get("FRED_API_KEY", "")
 
+session = requests.Session()
+session.headers.update({"User-Agent": "Mozilla/5.0"})
+
 # =========================================================
-# 🌎 全球主要經濟體設定
+# 🌎 國家設定
 # =========================================================
 COUNTRY_CONFIG = {
-
-    # 北美
     "USA": {
         "名稱": "美國",
         "洲": "北美",
         "貨幣": "USD",
-        "失業率": "UNRATE",
         "CPI": "CPIAUCSL",
-        "GDP": "A191RL1Q225SBEA",
+        "政策利率": "FEDFUNDS",
+        "10Y": "DGS10",
+        "股市": "^GSPC",
         "新聞": "United States economy"
     },
-
-    "CAN": {
-        "名稱": "加拿大",
-        "洲": "北美",
-        "貨幣": "CAD",
-        "失業率": "LRUNTTTTCAM156S",
-        "CPI": "CPALCY01CAM661N",
-        "GDP": "CANRGDPQDSMEI",
-        "新聞": "Canada economy"
-    },
-
-    "MEX": {
-        "名稱": "墨西哥",
-        "洲": "北美",
-        "貨幣": "MXN",
-        "失業率": "LRUNTTTTMXM156S",
-        "CPI": "MEXCPIALLMINMEI",
-        "GDP": "MEXRGDPQDSMEI",
-        "新聞": "Mexico economy"
-    },
-
-    # 歐洲
     "DEU": {
         "名稱": "德國",
         "洲": "歐洲",
         "貨幣": "EUR",
-        "失業率": "LRHUTTTTEM156S",
         "CPI": "CP0000EZ19M086NEST",
-        "GDP": "CLVMEURSCAB1GQEA",
+        "政策利率": "ECBDFR",
+        "10Y": "IRLTLT01DEM156N",
+        "股市": "^GDAXI",
         "新聞": "Germany economy"
     },
-
-    "FRA": {
-        "名稱": "法國",
-        "洲": "歐洲",
-        "貨幣": "EUR",
-        "失業率": "LRHUTTTTFRM156S",
-        "CPI": "FRACPIALLMINMEI",
-        "GDP": "FRARGDPQDSMEI",
-        "新聞": "France economy"
-    },
-
-    "GBR": {
-        "名稱": "英國",
-        "洲": "歐洲",
-        "貨幣": "GBP",
-        "失業率": "LRHUTTTTGBM156S",
-        "CPI": "GBRCPIALLMINMEI",
-        "GDP": "GBRRGDPQDSMEI",
-        "新聞": "United Kingdom economy"
-    },
-
-    "ITA": {
-        "名稱": "義大利",
-        "洲": "歐洲",
-        "貨幣": "EUR",
-        "失業率": "LRHUTTTTITM156S",
-        "CPI": "ITACPIALLMINMEI",
-        "GDP": "ITARGDPQDSMEI",
-        "新聞": "Italy economy"
-    },
-
-    # 亞洲
-    "CHN": {
-        "名稱": "中國",
-        "洲": "亞洲",
-        "貨幣": "CNY",
-        "失業率": "LRUN64TTCNQ156S",
-        "CPI": "CHNCPIALLMINMEI",
-        "GDP": "CHNRGDPNQDSMEI",
-        "新聞": "China economy"
-    },
-
     "JPN": {
         "名稱": "日本",
         "洲": "亞洲",
         "貨幣": "JPY",
-        "失業率": "JPNURMQSDSMEI",
         "CPI": "JPNCPIALLMINMEI",
-        "GDP": "JPNRGDPQDSMEI",
+        "政策利率": "IRSTCB01JPM156N",
+        "10Y": "IRLTLT01JPM156N",
+        "股市": "^N225",
         "新聞": "Japan economy"
     },
-
-    "KOR": {
-        "名稱": "韓國",
-        "洲": "亞洲",
-        "貨幣": "KRW",
-        "失業率": "LRUN64TTKRM156S",
-        "CPI": "KORCPIALLMINMEI",
-        "GDP": "KORRGDPQDSMEI",
-        "新聞": "South Korea economy"
-    },
-
-    "IND": {
-        "名稱": "印度",
-        "洲": "亞洲",
-        "貨幣": "INR",
-        "失業率": "INDUCEMPSLM",
-        "CPI": "INDCPIALLMINMEI",
-        "GDP": "INDRGDPQDSMEI",
-        "新聞": "India economy"
-    },
-
     "TWN": {
         "名稱": "台灣",
         "洲": "亞洲",
         "貨幣": "TWD",
-        "失業率": "TWNURM",
         "CPI": "TWNCPIALLMINMEI",
-        "GDP": "TWNRGDPQDSMEI",
+        "政策利率": None,
+        "10Y": None,
+        "股市": "^TWII",
         "新聞": "Taiwan economy"
-    },
-
-    # 南美
-    "BRA": {
-        "名稱": "巴西",
-        "洲": "南美",
-        "貨幣": "BRL",
-        "失業率": "LRUN64TTBRM156S",
-        "CPI": "BRACPIALLMINMEI",
-        "GDP": "BRARGDPQDSMEI",
-        "新聞": "Brazil economy"
-    },
-
-    "ARG": {
-        "名稱": "阿根廷",
-        "洲": "南美",
-        "貨幣": "ARS",
-        "失業率": "LRUN64TTARM156S",
-        "CPI": "ARGCPIALLMINMEI",
-        "GDP": "ARGRGDPQDSMEI",
-        "新聞": "Argentina economy"
-    },
-
-    # 非洲
-    "ZAF": {
-        "名稱": "南非",
-        "洲": "非洲",
-        "貨幣": "ZAR",
-        "失業率": "ZAFURQSMEI",
-        "CPI": "ZAFCPIALLMINMEI",
-        "GDP": "ZAFRGDPQDSMEI",
-        "新聞": "South Africa economy"
-    },
-
-    "EGY": {
-        "名稱": "埃及",
-        "洲": "非洲",
-        "貨幣": "EGP",
-        "失業率": "LRUN64TTEGM156S",
-        "CPI": "EGYCPIALLMINMEI",
-        "GDP": "EGYRGDPQDSMEI",
-        "新聞": "Egypt economy"
-    },
-
-    # 中東
-    "SAU": {
-        "名稱": "沙烏地阿拉伯",
-        "洲": "中東",
-        "貨幣": "SAR",
-        "失業率": "SAULRUN64TTM156S",
-        "CPI": "SAUCPIALLMINMEI",
-        "GDP": "SAURGDPNQDSMEI",
-        "新聞": "Saudi Arabia economy"
-    },
-
-    "TUR": {
-        "名稱": "土耳其",
-        "洲": "中東",
-        "貨幣": "TRY",
-        "失業率": "LRUN64TTTRM156S",
-        "CPI": "TURCPIALLMINMEI",
-        "GDP": "TURRGDPQDSMEI",
-        "新聞": "Turkey economy"
     }
 }
 
 # =========================================================
-# 🌐 Session
+# 🔧 手動 fallback（核心）
 # =========================================================
-session = requests.Session()
-session.headers.update({
-    "User-Agent": "Mozilla/5.0"
-})
+def get_or_manual(key, label):
+
+    if key not in st.session_state:
+        st.session_state[key] = None
+
+    value = st.session_state[key]
+
+    if value is None:
+
+        st.warning(f"{label} 無法取得數據，請手動輸入")
+
+        st.session_state[key] = st.number_input(
+            label,
+            step=0.1,
+            value=0.0,
+            key=key
+        )
+
+    return st.session_state[key]
 
 # =========================================================
-# 📦 FRED 抓取
+# 📦 FRED
 # =========================================================
 @st.cache_data(ttl=1800)
 def fetch_fred_series(series_id, limit=24):
+
+    if series_id is None:
+        return []
 
     try:
         url = "https://api.stlouisfed.org/fred/series/observations"
@@ -242,311 +115,159 @@ def fetch_fred_series(series_id, limit=24):
             "limit": limit
         }
 
-        response = session.get(url, params=params, timeout=10)
-        response.raise_for_status()
+        r = session.get(url, params=params, timeout=10)
+        r.raise_for_status()
 
-        data = response.json()
+        data = r.json()
 
-        observations = data.get("observations", [])
+        values = []
 
-        cleaned = []
+        for i in data.get("observations", []):
+            v = i.get("value")
+            if v != ".":
+                values.append(float(v))
 
-        for obs in observations:
-
-            value = obs.get("value")
-
-            if value != ".":
-                cleaned.append(float(value))
-
-        return cleaned
+        return values
 
     except:
         return []
 
 # =========================================================
-# 📈 CPI YoY 計算
+# 📈 CPI YoY
 # =========================================================
-def calculate_yoy(values):
+def calc_yoy(values):
 
     if len(values) < 13:
         return None
 
-    latest = values[0]
-    last_year = values[12]
-
     try:
-        return round(((latest / last_year) - 1) * 100, 2)
+        return round(((values[0] / values[12]) - 1) * 100, 2)
     except:
         return None
 
 # =========================================================
-# 💱 匯率
+# 💱 FX
 # =========================================================
-@st.cache_data(ttl=1800)
-def get_fx_rate(currency):
+def get_fx(currency):
 
     if currency == "USD":
         return 1.0
 
     try:
-        url = (
-            f"https://api.frankfurter.app/latest?"
-            f"from=USD&to={currency}"
-        )
-
-        response = session.get(url, timeout=10)
-        response.raise_for_status()
-
-        data = response.json()
-
-        return round(data["rates"][currency], 4)
+        url = f"https://api.frankfurter.app/latest?from=USD&to={currency}"
+        r = session.get(url, timeout=10)
+        r.raise_for_status()
+        return round(r.json()["rates"][currency], 4)
 
     except:
         return None
 
 # =========================================================
-# 📰 新聞
+# 📈 股票
 # =========================================================
-@st.cache_data(ttl=1800)
-def get_news(keyword):
+def get_stock(symbol):
 
     try:
-
-        url = (
-            f"https://news.google.com/rss/search?"
-            f"q={keyword}&hl=en-US&gl=US&ceid=US:en"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        r = session.get(url, timeout=10)
+        r.raise_for_status()
+        return round(
+            r.json()["chart"]["result"][0]["meta"]["regularMarketPrice"],
+            2
         )
-
-        response = session.get(url, timeout=10)
-        response.raise_for_status()
-
-        root = ET.fromstring(response.content)
-
-        news = []
-
-        for item in root.findall(".//item")[:5]:
-
-            title = item.find("title").text
-            link = item.find("link").text
-            pub_date = item.find("pubDate").text
-
-            news.append({
-                "title": title,
-                "link": link,
-                "date": pub_date[:16]
-            })
-
-        return news
-
     except:
-        return []
+        return None
 
 # =========================================================
-# 🌎 單國資料
+# 🌍 單國資料
 # =========================================================
-def fetch_country_data(code, info):
+def fetch_country(code, info):
 
-    unemployment = fetch_fred_series(
-        info["失業率"],
-        1
+    cpi_raw = fetch_fred_series(info["CPI"], 24)
+    rate_raw = fetch_fred_series(info["政策利率"], 1)
+    bond_raw = fetch_fred_series(info["10Y"], 1)
+
+    cpi = calc_yoy(cpi_raw)
+
+    rate = rate_raw[0] if rate_raw else None
+    bond = bond_raw[0] if bond_raw else None
+
+    fx = get_fx(info["貨幣"])
+    stock = get_stock(info["股市"])
+
+    # ================================
+    # 🔥 fallback layer
+    # ================================
+
+    cpi = cpi if cpi is not None else get_or_manual(
+        f"{code}_cpi",
+        f"{info['名稱']} CPI YoY"
     )
 
-    cpi = fetch_fred_series(
-        info["CPI"],
-        24
+    rate = rate if rate is not None else get_or_manual(
+        f"{code}_rate",
+        f"{info['名稱']} Policy Rate"
     )
 
-    gdp = fetch_fred_series(
-        info["GDP"],
-        1
+    bond = bond if bond is not None else get_or_manual(
+        f"{code}_bond",
+        f"{info['名稱']} 10Y Bond"
     )
-
-    fx = get_fx_rate(info["貨幣"])
 
     return {
-        "國家代碼": code,
         "國家": info["名稱"],
         "洲": info["洲"],
-        "貨幣": info["貨幣"],
-        "GDP 成長率 (%)": gdp[0] if gdp else None,
-        "通膨率 YoY (%)": calculate_yoy(cpi),
-        "失業率 (%)": unemployment[0] if unemployment else None,
-        "USD FX": fx
+        "CPI YoY (%)": cpi,
+        "政策利率 (%)": rate,
+        "10Y Bond (%)": bond,
+        "FX": fx,
+        "股票": stock
     }
 
 # =========================================================
-# ⚡ 平行抓取
+# ⚡ 全域資料
 # =========================================================
 @st.cache_data(ttl=1800)
-def build_dataset():
+def build():
 
     rows = []
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=8) as ex:
 
-        futures = []
+        futures = [
+            ex.submit(fetch_country, k, v)
+            for k, v in COUNTRY_CONFIG.items()
+        ]
 
-        for code, info in COUNTRY_CONFIG.items():
+        for f in futures:
+            rows.append(f.result())
 
-            futures.append(
-                executor.submit(
-                    fetch_country_data,
-                    code,
-                    info
-                )
-            )
-
-        for future in futures:
-            rows.append(future.result())
-
-    df = pd.DataFrame(rows)
-
-    numeric_cols = [
-        "GDP 成長率 (%)",
-        "通膨率 YoY (%)",
-        "失業率 (%)",
-        "USD FX"
-    ]
-
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(
-            df[col],
-            errors="coerce"
-        ).round(2)
-
-    return df
+    return pd.DataFrame(rows)
 
 # =========================================================
-# 📊 建立資料
+# 📊 RUN
 # =========================================================
-with st.spinner("🌍 全球經濟數據同步中..."):
+with st.spinner("Loading macro data..."):
+    df = build()
 
-    df = build_dataset()
+st.header("📊 Global Macro Overview")
+st.dataframe(df, use_container_width=True)
 
 # =========================================================
-# 🎛️ Sidebar
+# 🗺️ MAP
 # =========================================================
-st.sidebar.header("⚙️ Dashboard 控制台")
-
-continent_filter = st.sidebar.selectbox(
-    "選擇洲別",
-    [
-        "全部",
-        "北美",
-        "歐洲",
-        "亞洲",
-        "南美",
-        "非洲",
-        "中東"
-    ]
+metric = st.selectbox(
+    "Indicator",
+    ["CPI YoY (%)", "政策利率 (%)", "10Y Bond (%)", "FX"]
 )
-
-metric = st.sidebar.selectbox(
-    "選擇地圖指標",
-    [
-        "GDP 成長率 (%)",
-        "通膨率 YoY (%)",
-        "失業率 (%)",
-        "USD FX"
-    ]
-)
-
-# =========================================================
-# 🌍 Filter
-# =========================================================
-if continent_filter != "全部":
-
-    filtered_df = df[
-        df["洲"] == continent_filter
-    ]
-
-else:
-    filtered_df = df
-
-# =========================================================
-# 📋 Data Table
-# =========================================================
-st.header("📊 全球主要經濟體總覽")
-
-st.dataframe(
-    filtered_df,
-    hide_index=True,
-    use_container_width=True
-)
-
-# =========================================================
-# 🗺️ 地圖
-# =========================================================
-st.header("🗺️ 全球經濟熱力地圖")
 
 fig = px.choropleth(
-    filtered_df,
-    locations="國家代碼",
+    df,
+    locations="國家",
     color=metric,
     hover_name="國家",
     projection="natural earth",
     color_continuous_scale="Blues"
 )
 
-fig.update_layout(
-    margin={
-        "r": 0,
-        "t": 30,
-        "l": 0,
-        "b": 0
-    }
-)
-
-st.plotly_chart(
-    fig,
-    use_container_width=True
-)
-
-# =========================================================
-# 📰 財經新聞
-# =========================================================
-st.header("📰 全球即時財經新聞")
-
-tab_names = [
-    info["名稱"]
-    for info in COUNTRY_CONFIG.values()
-]
-
-tabs = st.tabs(tab_names)
-
-for tab, (_, info) in zip(
-    tabs,
-    COUNTRY_CONFIG.items()
-):
-
-    with tab:
-
-        news_items = get_news(
-            info["新聞"]
-        )
-
-        if not news_items:
-
-            st.warning("目前無新聞")
-
-        else:
-
-            for item in news_items:
-
-                st.markdown(
-                    f"""
-### [{item['title']}]({item['link']})
-
-⏱️ {item['date']}
-"""
-                )
-
-# =========================================================
-# 📌 Footer
-# =========================================================
-st.markdown("---")
-
-st.caption(
-    "Global Macro Dashboard Pro | "
-    "Built with Streamlit + FRED API"
-)
+st.plotly_chart(fig, use_container_width=True)
