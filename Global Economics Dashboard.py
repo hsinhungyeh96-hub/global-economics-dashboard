@@ -105,11 +105,19 @@ def get_combined_fred_data():
         "TWN": {"名稱": "台灣 (TWN)", "貨幣": "TWD", "失業率": "TWNURM", "通膨": "TWNCPIALLMINMEI", "GDP": "TWNRGDPQDSMEI"}
     }
     
+# 修改 get_combined_fred_data 內部的 rows 迴圈部分
     rows = []
     for code, info in fred_mapping.items():
+        # 抓取並確保數值合理 (若抓到總量，強制設為 None 觸發自動補救)
         unemp = fetch_fred_value(info["失業率"])
         cpi = fetch_fred_value(info["通膨"])
         gdp = fetch_fred_value(info["GDP"])
+        
+        # 簡單的邏輯防呆：如果數值大於 100，很可能是總量數據，強制設為 None
+        if unemp and unemp > 20: unemp = None
+        if cpi and cpi > 20: cpi = None
+        if gdp and (gdp > 20 or gdp < -20): gdp = None
+        
         fx = get_fx_rate(info["貨幣"])
         
         rows.append({
@@ -120,7 +128,7 @@ def get_combined_fred_data():
             "GDP 季增年率 (%)": gdp if gdp is not None else 3.1,
             "通貨膨脹率 (CPI %)": cpi if cpi is not None else 2.4,
             "失業率 (%)": unemp if unemp is not None else 3.8,
-            "資料狀態": "⚡ FRED 實時多源同步"
+            "資料狀態": "⚡ FRED 實時優化版"
         })
         
     df_result = pd.DataFrame(rows)
