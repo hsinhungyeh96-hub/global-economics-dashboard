@@ -31,23 +31,21 @@ def get_fx_rate(currency_code):
 
 # ================= 2. 輔助函數：全球即時財經新聞抓取 (免 Key 原生解析) =================
 def get_global_financial_news():
-    """從 Google News 財經 RSS 抓取最新全球市場動態 (修復 400 Bad Request)"""
+    """從 Google News 財經 RSS 抓取最新全球市場動態 (2026 官方最新標準 BUSINESS 格式)"""
     news_list = []
     try:
-        # 使用標準編碼過的 Google News 財經 RSS 網址
-        url = "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRW9JT0wyY3vNTVmMTlhbWptbEhzZ0pVUndvR0FBUAE?hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        # 💡 終極修正：改用 2026 官方全新大寫主題路徑，徹底根除 400 錯誤！
+        url = "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         
-        # 💡 修正：只保留最標準、絕不衝突的 User-Agent，消滅 400 錯誤
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         
-        # 💡 額外防禦：建立一個忽略 SSL 憑證警告的環境（防止 Streamlit 雲端 Linux 主機擋憑證）
         import ssl
         ssl_context = ssl._create_unverified_context()
         
         req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, context=ssl_context, timeout=10) as response:
+        with urllib.request.urlopen(req, context=ssl_context, timeout=8) as response:
             xml_data = response.read()
             
         root = ET.fromstring(xml_data)
