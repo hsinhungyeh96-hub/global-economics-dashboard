@@ -2,20 +2,20 @@ import streamlit as st
 import pandas as pd
 import datetime
 import urllib.request
-import urllib.parse
 import json
 import plotly.express as px
 import xml.etree.ElementTree as ET
+import urllib.parse
 
 # 基礎網頁設定
 st.set_page_config(page_title="全球自動化經濟儀表板", layout="wide")
 st.title("🌐 全球核心國家經濟數據全自動 Dashboard")
 st.write(f"📊 本地偵測時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-st.write("📡 數據來源：世界銀行 (Macro) ＋ 雅虎財經 (實時匯率) ＋ Google News (各國分頁新聞) 原生解析")
+st.write("📡 數據來源：世界銀行 (Macro) ＋ 雅虎財經 (實時匯率) ＋ Google News (各國專屬新聞) 原生解析")
 
 # ================= 1. 輔助函數：雅虎財經實時匯率抓取 =================
 def get_fx_rate(currency_code):
-    """直連 Yahoo Finance 抓取貨幣對美元的即時匯率 (1 美元等於多少該貨幣)"""
+    """直連 Yahoo Finance 抓取貨幣對美元的即時匯率"""
     if currency_code == "USD":
         return 1.0
     try:
@@ -30,17 +30,20 @@ def get_fx_rate(currency_code):
         fallbacks = {"EUR": 0.92, "JPY": 155.2, "GBP": 0.79, "AUD": 1.51, "INR": 83.4, "BRA": 5.15, "ZAF": 18.5, "IDN": 16000.0, "ARE": 3.67, "RUB": 91.0, "SGP": 1.35, "TWN": 32.3}
         return fallbacks.get(currency_code, None)
 
-# ================= 2. 輔助函數：各國精準分頁新聞抓取 =================
-def get_country_news(keyword):
-    """透過關鍵字精準搜尋各國即時財經新聞，100% 免疫 400 錯誤"""
+# ================= 2. 輔助函數：各國專屬財經新聞抓取 (動態搜尋) =================
+def get_country_specific_news(country_name):
+    """根據選定的國家名稱，動態向 Google News RSS 搜尋最新精選財經新聞"""
     news_list = []
     try:
-        # 將關鍵字編碼 (例如: "美國 財經")
-        query_str = urllib.parse.quote(f"{keyword} 財經")
-        url = f"https://news.google.com/rss/search?q={query_str}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        # 💡 將國家名稱加上財經關鍵字，並進行網頁安全編碼 (URL Encode)
+        query = f"{country_name} 財經 經濟"
+        encoded_query = urllib.parse.quote(query)
+        
+        # 使用 Google News 搜尋型 RSS 接口，精準撈取該國新聞
+        url = f"https://news.google.com/rss/search?q={encoded_query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         
         import ssl
@@ -51,7 +54,7 @@ def get_country_news(keyword):
             xml_data = response.read()
             
         root = ET.fromstring(xml_data)
-        for item in root.findall('.//item')[:6]: # 每國精選 6 條新聞
+        for item in root.findall('.//item')[:6]: # 嚴格限制 6 條，秒開防過載
             title = item.find('title').text
             link = item.find('link').text
             pub_date = item.find('pubDate').text
@@ -61,8 +64,11 @@ def get_country_news(keyword):
                 date_parsed = pub_date[:16]
             news_list.append({"時間": date_parsed, "新聞標題": title, "連結": link})
             
-    except Exception as e:
-        news_list.append({"時間": "📡 提示", "新聞標題": f"{keyword}新聞載入稍慢，請稍後點擊按鈕重試。({str(e)})", "連結": "#"})
+    except Exception as ne:
+        news_list.append({"時間": "📡 提示", "新聞標題": f"暫時無法取得 {country_name} 新聞，請稍候重試。({str(ne)})", "連結": "#"})
+        
+    if not news_list:
+        news_list.append({"時間": "📡 提示", "新聞標題": f"目前暫無 {country_name} 的即時重大經貿新聞。", "連結": "#"})
     return news_list
 
 # ================= 3. 原生 API 數據大融合 =================
@@ -148,7 +154,7 @@ df = get_combined_global_data()
 st.header("📋 全球大盤實時數據中心")
 
 if df is not None and not df.empty:
-    # ─── 區塊 A：核心數據一覽表 (最上方) ───
+    # ✨ 1. 核心數據表格 (最上方)
     st.subheader("📊 核心數據一覽表")
     st.dataframe(
         df, 
@@ -163,32 +169,28 @@ if df is not None and not df.empty:
     
     st.markdown("---")
     
-    # ─── 區塊 B：多國分頁即時新聞 (中間) ───
-    st.subheader("📰 全球核心國家即時財經新聞")
+    # ✨ 2. 國家專屬即時新聞區塊 (中間) - 徹底修復「少了很多國家」的問題！
+    st.subheader("📰 各國即時定向財經新聞中心")
     
-    if st.button("🔄 同步刷新所有新聞"):
-        st.cache_data.clear()
-        
-    # 💡 建立分頁 Tabs
-    tabs = st.tabs(["🌐 全球綜合", "🇺🇸 美國", "🇹🇼 台灣", "🇯🇵 日本", "🇪🇺 歐洲/德國", "🇬🇧 英國", "🇨🇳 中國/香港"])
+    # 提取所有可選國家清單
+    available_countries = [c.split(" ")[0] for c in df["國家"].tolist()] # 拿掉括號，只保留 "美國", "日本", "台灣" 等乾淨字眼
     
-    # 對應各分頁的搜尋關鍵字
-    tab_keywords = ["全球", "美國", "台灣", "日本", "歐洲", "英國", "中國"]
+    # 新聞專用的國家切換下拉選單
+    selected_news_country = st.selectbox("🎯 請選擇你想查看的經貿新聞國家：", available_countries, index=0)
     
-    for i, tab in enumerate(tabs):
-        with tab:
-            news_data = get_country_news(tab_keywords[i])
-            col1, col2 = st.columns(2)
-            for idx, item in enumerate(news_data):
-                target_col = col1 if idx % 2 == 0 else col2
-                with target_col:
-                    st.markdown(f"**⏱️ {item['時間']}** ── [{item['新聞標題']}]({item['連結']})")
+    # 動態向雲端獲取該國新聞
+    news_data = get_country_specific_news(selected_news_country)
+    
+    col1, col2 = st.columns(2)
+    for idx, item in enumerate(news_data):
+        target_col = col1 if idx % 2 == 0 else col2
+        with target_col:
+            st.markdown(f"**⏱️ {item['時間']}** ── [{item['新聞標題']}]({item['連結']})")
             
     st.markdown("---")
     
-    # ─── 區塊 C：全球動態互動地圖 (最下方) ───
+    # ✨ 3. 互動地圖 (最下方)
     st.subheader("🗺️ 全球動態互動地圖")
-    
     target_metric = st.selectbox(
         "選擇地圖著色指標：", 
         ["GDP 年增率 (%)", "通貨膨脹率 (CPI %)", "失業率 (%)", "兌美元匯率 (FX)"]
@@ -212,15 +214,11 @@ if df is not None and not df.empty:
             color_continuous_scale=px.colors.sequential.YlGnBu, 
             projection="natural earth"
         )
-        
         fig.update_layout(
             margin={"r":0,"t":30,"l":0,"b":0},
             geo=dict(
-                showframe=False,
-                showcoastlines=True,
-                showland=True,
-                landcolor="rgba(235, 235, 235, 0.7)", 
-                projection_type='equirectangular'
+                showframe=False, showcoastlines=True, showland=True,
+                landcolor="rgba(235, 235, 235, 0.7)", projection_type='equirectangular'
             )
         )
         st.plotly_chart(fig, use_container_width=True)
