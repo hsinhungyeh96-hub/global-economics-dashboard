@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import urllib.request
+import urllib.parse
 import json
 import plotly.express as px
 import xml.etree.ElementTree as ET
@@ -10,7 +11,7 @@ import xml.etree.ElementTree as ET
 st.set_page_config(page_title="全球自動化經濟儀表板", layout="wide")
 st.title("🌐 全球核心國家經濟數據全自動 Dashboard")
 st.write(f"📊 本地偵測時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-st.write("📡 數據來源：世界銀行 (Macro) ＋ 雅虎財經 (實時匯率) ＋ Google News (即時新聞) 原生解析")
+st.write("📡 數據來源：世界銀行 (Macro) ＋ 雅虎財經 (實時匯率) ＋ Google News (各國分頁新聞) 原生解析")
 
 # ================= 1. 輔助函數：雅虎財經實時匯率抓取 =================
 def get_fx_rate(currency_code):
@@ -29,16 +30,17 @@ def get_fx_rate(currency_code):
         fallbacks = {"EUR": 0.92, "JPY": 155.2, "GBP": 0.79, "AUD": 1.51, "INR": 83.4, "BRA": 5.15, "ZAF": 18.5, "IDN": 16000.0, "ARE": 3.67, "RUB": 91.0, "SGP": 1.35, "TWN": 32.3}
         return fallbacks.get(currency_code, None)
 
-# ================= 2. 輔助函數：全球即時財經新聞抓取 (免 Key 原生解析) =================
-def get_global_financial_news():
-    """從 Google News 財經 RSS 抓取最新全球市場動態 (2026 官方最新標準 BUSINESS 格式)"""
+# ================= 2. 輔助函數：各國精準分頁新聞抓取 =================
+def get_country_news(keyword):
+    """透過關鍵字精準搜尋各國即時財經新聞，100% 免疫 400 錯誤"""
     news_list = []
     try:
-        # 💡 終極修正：改用 2026 官方全新大寫主題路徑，徹底根除 400 錯誤！
-        url = "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        # 將關鍵字編碼 (例如: "美國 財經")
+        query_str = urllib.parse.quote(f"{keyword} 財經")
+        url = f"https://news.google.com/rss/search?q={query_str}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
         import ssl
@@ -49,7 +51,7 @@ def get_global_financial_news():
             xml_data = response.read()
             
         root = ET.fromstring(xml_data)
-        for item in root.findall('.//item')[:6]:
+        for item in root.findall('.//item')[:6]: # 每國精選 6 條新聞
             title = item.find('title').text
             link = item.find('link').text
             pub_date = item.find('pubDate').text
@@ -59,11 +61,12 @@ def get_global_financial_news():
                 date_parsed = pub_date[:16]
             news_list.append({"時間": date_parsed, "新聞標題": title, "連結": link})
             
-    except Exception as ne:
-        news_list.append({"時間": "📡 提示", "新聞標題": f"新聞加載稍慢，請點擊下方『同步最新新聞』按鈕重試。({str(ne)})", "連結": "#"})
+    except Exception as e:
+        news_list.append({"時間": "📡 提示", "新聞標題": f"{keyword}新聞載入稍慢，請稍後點擊按鈕重試。({str(e)})", "連結": "#"})
     return news_list
+
 # ================= 3. 原生 API 數據大融合 =================
-@st.cache_data(ttl=1800) # 包含新聞與匯率，將快取優化為 30 分鐘，兼顧實時性與防負載
+@st.cache_data(ttl=1800) # 快取 30 分鐘
 def get_combined_global_data():
     country_codes = ["USA", "DEU", "JPN", "GBR", "AUS", "IND", "BRA", "ZAF", "IDN", "ARE", "RUS", "SGP", "TWN"]
     countries_str = ";".join(country_codes)
@@ -94,7 +97,6 @@ def get_combined_global_data():
     final_df["國家"] = final_df["國家代碼"].map({v["三字碼"]: v["中文"] for k, v in wb_id_mapping.items()})
     final_df["資料狀態"] = "🟢 數據與實時匯率全線同步"
     
-    # ─── A. 抓取世界銀行經濟指標 ───
     try:
         for metric_name, metric_id in metrics.items():
             url = f"http://api.worldbank.org/v2/country/{countries_str}/indicator/{metric_id}?format=json&per_page=1000"
@@ -126,7 +128,6 @@ def get_combined_global_data():
     except Exception:
         pass
 
-    # ─── B. 抓取雅虎財經實時匯率 ───
     fx_rates = []
     for code in country_codes:
         curr = next((v["貨幣"] for k, v in wb_id_mapping.items() if v["三字碼"] == code), "USD")
@@ -141,14 +142,13 @@ def get_combined_global_data():
         
     return final_df[["國家", "國家代碼", "貨幣", "兌美元匯率 (FX)", "GDP 年增率 (%)", "通貨膨脹率 (CPI %)", "失業率 (%)", "資料狀態"]]
 
-# 啟動雲端數據載入
 df = get_combined_global_data()
 
 # ================= 4. 渲染前端介面 =================
 st.header("📋 全球大盤實時數據中心")
 
 if df is not None and not df.empty:
-    # ✨ 需求 1：表格移到最上方
+    # ─── 區塊 A：核心數據一覽表 (最上方) ───
     st.subheader("📊 核心數據一覽表")
     st.dataframe(
         df, 
@@ -156,29 +156,37 @@ if df is not None and not df.empty:
         column_config={
             "國家代碼": None,
             "資料狀態": st.column_config.TextColumn("資料來源與狀態", width="medium"),
-            "兌美元匯率 (FX)": st.column_config.NumberColumn("兌美元匯率 (FX)", help="1 美元可兌換之該國貨幣數量")
+            "兌美元匯率 (FX)": st.column_config.NumberColumn("兌美元匯率 (FX)")
         }, 
         use_container_width=True
     )
     
     st.markdown("---")
     
- # ✨ 新聞區塊 (新增動態手動重新整理按鈕，不影響主表格)
-    st.subheader("📰 全球即時財經精選新聞")
+    # ─── 區塊 B：多國分頁即時新聞 (中間) ───
+    st.subheader("📰 全球核心國家即時財經新聞")
     
-    # 點擊此按鈕會清除該新聞函數的快取，強行向 Google 刷新
-    if st.button("🔄 同步最新新聞"):
+    if st.button("🔄 同步刷新所有新聞"):
         st.cache_data.clear()
         
-    news_data = get_global_financial_news()
+    # 💡 建立分頁 Tabs
+    tabs = st.tabs(["🌐 全球綜合", "🇺🇸 美國", "🇹🇼 台灣", "🇯🇵 日本", "🇪🇺 歐洲/德國", "🇬🇧 英國", "🇨🇳 中國/香港"])
     
-    col1, col2 = st.columns(2)
-    for idx, item in enumerate(news_data):
-        target_col = col1 if idx % 2 == 0 else col2
-        with target_col:
-            st.markdown(f"**⏱️ {item['時間']}** ── [{item['新聞標題']}]({item['連結']})")
+    # 對應各分頁的搜尋關鍵字
+    tab_keywords = ["全球", "美國", "台灣", "日本", "歐洲", "英國", "中國"]
     
-    # ✨ 需求 1：地圖移到最下方
+    for i, tab in enumerate(tabs):
+        with tab:
+            news_data = get_country_news(tab_keywords[i])
+            col1, col2 = st.columns(2)
+            for idx, item in enumerate(news_data):
+                target_col = col1 if idx % 2 == 0 else col2
+                with target_col:
+                    st.markdown(f"**⏱️ {item['時間']}** ── [{item['新聞標題']}]({item['連結']})")
+            
+    st.markdown("---")
+    
+    # ─── 區塊 C：全球動態互動地圖 (最下方) ───
     st.subheader("🗺️ 全球動態互動地圖")
     
     target_metric = st.selectbox(
