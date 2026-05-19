@@ -1,3 +1,15 @@
+# =========================================================
+# 💡 雲端部署頑固環境終極修正：啟動時強行自動下載套件
+import os
+import sys
+
+try:
+    import plotly.express as px
+except ModuleNotFoundError:
+    # 如果發現雲端環境沒有裝成功，強行用系統底層指令下載
+    os.system(f"{sys.executable} -m pip install plotly pandas")
+    import plotly.express as px
+# =========================================================
 import streamlit as st
 import pandas as pd
 import datetime
