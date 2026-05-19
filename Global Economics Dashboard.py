@@ -22,7 +22,7 @@ st.write(
     f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 )
 
-FRED_API_KEY = st.secrets["FRED_API_KEY"]
+FRED_API_KEY = st.secrets.get("FRED_API_KEY", "")
 
 # =========================================================
 # 🌎 全球主要經濟體
