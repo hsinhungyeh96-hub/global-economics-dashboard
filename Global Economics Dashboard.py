@@ -358,7 +358,8 @@ for tab, (_, info) in zip(tabs, COUNTRY_CONFIG.items()):
             titles = [item['title'] for item in news_items]
             with st.expander("🤖 AI 每日新聞總結與分析", expanded=True):
                 with st.spinner("AI 正在分析市場動態..."):
-                    summary = get_ai_summary(titles)
+                    today = datetime.date.today().strftime("%Y-%m-%d")
+                    summary = get_ai_summary(titles, today)
                     st.markdown(summary)
             # -----------------------
             
