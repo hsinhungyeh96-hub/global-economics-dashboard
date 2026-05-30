@@ -225,9 +225,9 @@ def fetch_country_data(code, info):
         "洲": info["洲"],
         "代表指數": info["指數"],
         "指數點位": round(price, 2) if price else None,
-        "單日漲跌幅 (%)": round(pct_change, 2) if pct_change else None,
-        "年初至今報酬 (%)": round(ytd_change, 2) if ytd_change else None,
-        "單日單日匯率漲跌幅 (%)": round(fx_change, 2) if fx_change is not None else None # 修改這裡
+        "單日指數漲跌幅 (%)": round(pct_change, 2) if pct_change else None,
+        "年初指數至今報酬 (%)": round(ytd_change, 2) if ytd_change else None,
+        "單日匯率漲跌幅 (%)": round(fx_change, 2) if fx_change is not None else None # 修改這裡
     }
 
 # =========================================================
@@ -247,8 +247,8 @@ def build_dataset():
     # 如果你在 fetch_country_data 裡改名了，這裡也必須同步修改！
     numeric_cols = [
         "指數點位", 
-        "單日漲跌幅 (%)", 
-        "年初至今報酬 (%)", 
+        "單日指數漲跌幅 (%)", 
+        "年初指數至今報酬 (%)", 
         "單日匯率漲跌幅 (%)"  # 這裡要確認是否已改名
     ]
     
@@ -282,7 +282,7 @@ continent_filter = st.sidebar.selectbox(
 # sidebar 選項要與字典中的 Key 嚴格對應
 metric = st.sidebar.selectbox(
     "選擇地圖指標",
-    ["單日漲跌幅 (%)", "年初至今報酬 (%)", "單日匯率漲跌幅 (%)", "指數點位"]
+    ["單日指數漲跌幅 (%)", "年初指數至今報酬 (%)", "單日匯率漲跌幅 (%)", "指數點位"]
 )
 
 # =========================================================
@@ -324,8 +324,8 @@ st.dataframe(
 # =========================================================
 st.header("🗺️ 全球市場熱力地圖")
 
-# 針對單日漲跌幅與年初至今報酬，皆使用紅綠配色 (RdYlGn)
-if metric in ["單日漲跌幅 (%)", "年初至今報酬 (%)"]:
+# 針對單日指數漲跌幅與年初指數至今報酬，皆使用紅綠配色 (RdYlGn)
+if metric in ["單日指數漲跌幅 (%)", "年初指數至今報酬 (%)"]:
     color_scale = "RdYlGn"
     midpoint = 0 # 讓 0% 保持在中性顏色
 else:
