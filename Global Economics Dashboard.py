@@ -6,6 +6,34 @@ import plotly.express as px
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
+import openai # 需要 pip install openai
+
+# 設定您的 API Key
+client = openai.OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", "sk-da5dbf23b9e14cb08ef017e8f13c52e0"))
+
+@st.cache_data(ttl=3600) # 1小時總結一次，避免重複呼叫浪費 API
+def get_ai_summary(news_titles):
+    if not news_titles:
+        return "暫無新聞可供分析。"
+    
+    prompt = f"""
+    請針對以下關於該國經濟的即時新聞標題進行簡短分析與總結：
+    {', '.join(news_titles)}
+    
+    請以專業財經分析師的角度，提供：
+    1. 【市場焦點】：一句話點出主要趨勢。
+    2. 【潛在影響】：對該國股市或匯率的可能影響。
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": "你是一位資深的全球總經分析師。"},
+                      {"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"AI 分析暫時無法取得: {e}"
 
 # =========================================================
 # 🌍 基礎設定
@@ -314,16 +342,21 @@ tabs = st.tabs(tab_names)
 for tab, (_, info) in zip(tabs, COUNTRY_CONFIG.items()):
     with tab:
         news_items = get_news(info["新聞"])
+        
         if not news_items:
             st.warning("目前無新聞")
         else:
+            # --- 新增 AI 分析區塊 ---
+            titles = [item['title'] for item in news_items]
+            with st.expander("🤖 AI 每日新聞總結與分析", expanded=True):
+                with st.spinner("AI 正在分析市場動態..."):
+                    summary = get_ai_summary(titles)
+                    st.markdown(summary)
+            # -----------------------
+            
+            st.divider() # 加入分隔線
             for item in news_items:
-                st.markdown(
-                    f"""
-### [{item['title']}]({item['link']})
-⏱️ {item['date']}
-"""
-                )
+                st.markdown(f"### [{item['title']}]({item['link']}) \n ⏱️ {item['date']}")
 
 # =========================================================
 # 📌 Footer
