@@ -7,10 +7,18 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 from openai import OpenAI
+import streamlit as st
 
-# 替換為您的 DeepSeek API Key
-DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "sk-da5dbf23b9e14cb08ef017e8f13c52e0")
+# 從 Secrets 中讀取，如果讀不到則使用空字串
+api_key = st.secrets.get("DEEPSEEK_API_KEY")
 
+if not api_key:
+    st.error("找不到 API Key，請檢查 Streamlit Secrets 設定！")
+else:
+    client = OpenAI(
+        api_key=api_key, 
+        base_url="https://api.deepseek.com"
+    )
 client = OpenAI(
     api_key=DEEPSEEK_API_KEY, 
     base_url="https://api.deepseek.com" # 這是 DeepSeek 的官方接口
