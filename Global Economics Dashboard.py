@@ -9,16 +9,20 @@ import yfinance as yf
 from openai import OpenAI
 import streamlit as st
 
-# 1. 確保從 secrets 讀取
-# st.secrets["DEEPSEEK_API_KEY"] 會直接讀取您在網頁上設定的 Key
-api_key = st.secrets["DEEPSEEK_API_KEY"]
+# =========================================================
+# 🔐 API 安全設定
+# =========================================================
+# 使用 get 方法，若讀不到會給出明確錯誤提示，而不是直接跳 KeyError
+try:
+    api_key = st.secrets["DEEPSEEK_API_KEY"]
+except Exception:
+    st.error("❌ 系統偵測不到 API Key！請檢查 Streamlit Cloud Settings > Secrets 是否已存入 DEEPSEEK_API_KEY")
+    st.stop() # 停止程式，避免後續報錯
 
-# 2. 正確將變數傳入 client
 client = OpenAI(
     api_key=api_key, 
     base_url="https://api.deepseek.com"
 )
-
 @st.cache_data(ttl=86400)
 def get_ai_summary(news_titles, date_str):
     if not news_titles:
