@@ -6,30 +6,38 @@ import plotly.express as px
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
-import openai # 需要 pip install openai
+from openai import OpenAI
 
-# 設定您的 API Key
-client = openai.OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", "sk-da5dbf23b9e14cb08ef017e8f13c52e0"))
+# 替換為您的 DeepSeek API Key
+DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "sk-da5dbf23b9e14cb08ef017e8f13c52e0")
 
-@st.cache_data(ttl=3600) # 1小時總結一次，避免重複呼叫浪費 API
-def get_ai_summary(news_titles):
+client = OpenAI(
+    api_key=DEEPSEEK_API_KEY, 
+    base_url="https://api.deepseek.com" # 這是 DeepSeek 的官方接口
+)
+
+@st.cache_data(ttl=86400)
+def get_ai_summary(news_titles, date_str):
     if not news_titles:
-        return "暫無新聞可供分析。"
+        return "暫無新聞。"
     
     prompt = f"""
-    請針對以下關於該國經濟的即時新聞標題進行簡短分析與總結：
+    今天是 {date_str}，以下是關於該國經濟的即時新聞標題：
     {', '.join(news_titles)}
     
-    請以專業財經分析師的角度，提供：
-    1. 【市場焦點】：一句話點出主要趨勢。
-    2. 【潛在影響】：對該國股市或匯率的可能影響。
+    請以專業財經分析師角度提供簡短分析：
+    1. 【市場焦點】：一句話總結今日主要趨勢。
+    2. 【潛在影響】：對股市與匯率的影響預測。
     """
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "system", "content": "你是一位資深的全球總經分析師。"},
-                      {"role": "user", "content": prompt}]
+            model="deepseek-chat", # DeepSeek 的模型名稱
+            messages=[
+                {"role": "system", "content": "你是一位資深的全球總經分析師，請提供專業且客觀的市場洞察。"},
+                {"role": "user", "content": prompt}
+            ],
+            stream=False
         )
         return response.choices[0].message.content
     except Exception as e:
