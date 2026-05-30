@@ -377,8 +377,8 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
             # --- AI 分析區塊 (現在台灣也會執行) ---
             titles = [item['title'] for item in news_items]
           with st.container(border=True): # 加入邊框，讓格式更穩固
-               st.markdown("### 🤖 每日市場總結")
-          with st.spinner("AI 正在整理報告..."):
+            st.markdown("### 🤖 每日市場總結")
+            with st.spinner("AI 正在整理報告..."):
                today = datetime.date.today().strftime("%Y-%m-%d")
                summary = get_ai_summary(titles, today)
                st.markdown(summary)
