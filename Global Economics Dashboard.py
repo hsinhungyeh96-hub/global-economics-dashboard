@@ -117,6 +117,28 @@ def fetch_live_market_data(ticker_symbol, currency_pair):
     return price, pct_change, ytd_change, rate
 
 # =========================================================
+# 🌎 全球核心總經指標抓取
+# =========================================================
+@st.cache_data(ttl=300)
+def fetch_global_metrics():
+    # 定義指標代碼與名稱
+    metrics = {
+        "恐慌指數 (VIX)": "^VIX",
+        "黃金 (Gold)": "GC=F",
+        "原油 (Crude Oil)": "CL=F",
+        "10年期美債殖利率": "^TNX"
+    }
+    
+    results = {}
+    for name, ticker in metrics.items():
+        data = yf.Ticker(ticker).history(period="2d")
+        if len(data) >= 2:
+            latest = data['Close'].iloc[-1]
+            prev = data['Close'].iloc[-2]
+            results[name] = {"val": latest, "delta": latest - prev}
+    return results
+
+# =========================================================
 # 📰 新聞 (保持原樣)
 # =========================================================
 @st.cache_data(ttl=1800)
@@ -225,6 +247,21 @@ if continent_filter != "全部":
     filtered_df = df[df["洲"] == continent_filter]
 else:
     filtered_df = df
+
+# =========================================================
+# 📈 全球總經 KPI 板塊
+# =========================================================
+st.subheader("🌍 全球核心市場指標")
+global_data = fetch_global_metrics()
+
+cols = st.columns(4)
+for col, (name, data) in zip(cols, global_data.items()):
+    col.metric(
+        label=name, 
+        value=f"{data['val']:.2f}", 
+        delta=f"{data['delta']:.2f}"
+    )
+st.markdown("---") # 分隔線
 
 # =========================================================
 # 📋 Data Table
