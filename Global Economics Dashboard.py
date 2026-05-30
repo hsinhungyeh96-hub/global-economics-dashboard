@@ -237,22 +237,25 @@ def fetch_country_data(code, info):
 def build_dataset():
     rows = []
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = []
-        for code, info in COUNTRY_CONFIG.items():
-            futures.append(
-                executor.submit(
-                    fetch_country_data,
-                    code,
-                    info
-                )
-            )
+        futures = [executor.submit(fetch_country_data, code, info) for code, info in COUNTRY_CONFIG.items()]
         for future in futures:
             rows.append(future.result())
 
     df = pd.DataFrame(rows)
-    numeric_cols = ["指數點位", "單日漲跌幅 (%)", "年初至今報酬 (%)", "匯率 (兌 USD)"]
+    
+    # 【關鍵檢查】：這裡的欄位名稱必須與 fetch_country_data 中的字典 Key 完全吻合
+    # 如果你在 fetch_country_data 裡改名了，這裡也必須同步修改！
+    numeric_cols = [
+        "指數點位", 
+        "單日漲跌幅 (%)", 
+        "年初至今報酬 (%)", 
+        "匯率漲跌幅 (%)"  # 這裡要確認是否已改名
+    ]
+    
+    # 這裡增加一個過濾，避免因為欄位不存在而報錯
     for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 # =========================================================
