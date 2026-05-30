@@ -368,17 +368,14 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
         if not news_items:
             st.warning("目前無新聞")
         else:
-            # --- 修改邏輯：如果是台灣，則跳過 AI 分析 ---
-            if code == "TWN":
-                st.info("ℹ️ 台灣市場財經新聞連結：")
-            else:
-                titles = [item['title'] for item in news_items]
-                with st.expander(f"🤖 AI 每日市場總結 ({datetime.date.today().strftime('%Y-%m-%d')})", expanded=True):
-                    with st.spinner("AI 正在分析市場動態..."):
-                        today = datetime.date.today().strftime("%Y-%m-%d")
-                        summary = get_ai_summary(titles, today)
-                        st.markdown(summary)
-            # ----------------------------------------
+            # --- AI 分析區塊 (現在台灣也會執行) ---
+            titles = [item['title'] for item in news_items]
+            with st.expander(f"🤖 AI 每日市場總結 ({datetime.date.today().strftime('%Y-%m-%d')})", expanded=True):
+                with st.spinner("AI 正在分析市場動態..."):
+                    today = datetime.date.today().strftime("%Y-%m-%d")
+                    # 直接呼叫 AI
+                    summary = get_ai_summary(titles, today)
+                    st.markdown(summary)
             
             st.divider() 
             for item in news_items:
