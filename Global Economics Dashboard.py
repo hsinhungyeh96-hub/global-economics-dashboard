@@ -28,10 +28,10 @@ def get_ai_summary(news_titles, date_str):
     if not news_titles:
         return "⚠️ 目前無相關新聞，無法進行分析。"
     
-    # 強制規定輸出格式
+ # 強制規定輸出格式
     prompt = f"""
     今天是 {date_str}，請針對以下新聞標題進行財經總結。
-    請嚴格遵守以下格式輸出，不要包含任何開場白或結語：
+    請嚴格遵守以下格式輸出，不要使用任何 Markdown 的標題語法 (如 #, ##, ###)，改用粗體 **文字** 來表示標題：
 
     ---
     ### 🎯 市場焦點
@@ -382,11 +382,7 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
                 with st.spinner("AI 正在整理報告..."):
                     today = datetime.date.today().strftime("%Y-%m-%d")
                     summary = get_ai_summary(titles, today)
-                    st.markdown(f"""
-                    <div style="font-size: 14px; line-height: 1.6; color: #333;">
-                        {summary}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(summary)
             
             st.divider() 
             for item in news_items:
