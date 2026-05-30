@@ -115,18 +115,15 @@ session.headers.update({
 })
 
 # =========================================================
-# 📈 Yahoo Finance 抓取 (股市與匯率)
+# 📈 Yahoo Finance 抓取 (更新匯率為漲跌幅)
 # =========================================================
-@st.cache_data(ttl=300) # 5分鐘快取
+@st.cache_data(ttl=300)
 def fetch_live_market_data(ticker_symbol, currency_pair):
-    # 預設所有回傳值為 None
-    price, pct_change, ytd_change, rate = None, None, None, None
+    price, pct_change, ytd_change, fx_change = None, None, None, None
     
-    # 1. 抓取股市 (包含單日與 YTD)
+    # 1. 股市抓取 (保持不變)
     try:
         stock = yf.Ticker(ticker_symbol)
-        
-        # 單日漲跌幅計算
         hist = stock.history(period="5d")
         if len(hist) >= 2:
             price = hist['Close'].iloc[-1]
@@ -135,29 +132,29 @@ def fetch_live_market_data(ticker_symbol, currency_pair):
         elif not hist.empty:
             price = hist['Close'].iloc[-1]
 
-        # YTD (年初至今報酬率) 計算
         ytd_hist = stock.history(period="ytd")
         if not ytd_hist.empty and len(ytd_hist) > 1 and price is not None:
-            first_price_this_year = ytd_hist['Close'].iloc[0]
-            ytd_change = ((price / first_price_this_year) - 1) * 100
-            
-    except Exception as e:
-        print(f"股市抓取失敗 {ticker_symbol}: {e}")
+            first_price = ytd_hist['Close'].iloc[0]
+            ytd_change = ((price / first_price) - 1) * 100
+    except:
+        pass
 
-    # 2. 抓取匯率
+    # 2. 匯率漲跌幅計算
     try:
         if currency_pair == "USD=X":
-            rate = 1.0
+            fx_change = 0.0
         else:
             fx = yf.Ticker(currency_pair)
-            fx_hist = fx.history(period="1d")
-            if not fx_hist.empty:
-                rate = fx_hist['Close'].iloc[-1]
-    except Exception as e:
-        print(f"匯率抓取失敗 {currency_pair}: {e}")
-
-    # 回傳 4 個值
-    return price, pct_change, ytd_change, rate
+            fx_hist = fx.history(period="5d") # 抓 5 天計算漲跌
+            if len(fx_hist) >= 2:
+                curr = fx_hist['Close'].iloc[-1]
+                prev = fx_hist['Close'].iloc[-2]
+                # 匯率漲跌幅定義：(今日匯率 - 昨日匯率) / 昨日匯率
+                fx_change = ((curr / prev) - 1) * 100
+    except:
+        pass
+        
+    return price, pct_change, ytd_change, fx_change
 
 # =========================================================
 # 🌎 全球核心總經指標抓取
@@ -220,8 +217,7 @@ def get_news(keyword):
 # 🌎 單國資料組裝
 # =========================================================
 def fetch_country_data(code, info):
-    # 這裡必須多加 ytd_change 來接收回傳值
-    price, pct_change, ytd_change, rate = fetch_live_market_data(info["指數"], info["匯率"])
+    price, pct_change, ytd_change, fx_change = fetch_live_market_data(info["指數"], info["匯率"])
 
     return {
         "國家代碼": code,
@@ -230,8 +226,8 @@ def fetch_country_data(code, info):
         "代表指數": info["指數"],
         "指數點位": round(price, 2) if price else None,
         "單日漲跌幅 (%)": round(pct_change, 2) if pct_change else None,
-        "年初至今報酬 (%)": round(ytd_change, 2) if ytd_change else None, # 新增這個欄位
-        "匯率 (兌 USD)": round(rate, 4) if rate else None
+        "年初至今報酬 (%)": round(ytd_change, 2) if ytd_change else None,
+        "匯率漲跌幅 (%)": round(fx_change, 2) if fx_change is not None else None # 修改這裡
     }
 
 # =========================================================
