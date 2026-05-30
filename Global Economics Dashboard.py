@@ -139,7 +139,7 @@ def fetch_live_market_data(ticker_symbol, currency_pair):
     except:
         pass
 
-    # 2. 匯率漲跌幅計算
+    # 2. 單日匯率漲跌幅計算
     try:
         if currency_pair == "USD=X":
             fx_change = 0.0
@@ -149,7 +149,7 @@ def fetch_live_market_data(ticker_symbol, currency_pair):
             if len(fx_hist) >= 2:
                 curr = fx_hist['Close'].iloc[-1]
                 prev = fx_hist['Close'].iloc[-2]
-                # 匯率漲跌幅定義：(今日匯率 - 昨日匯率) / 昨日匯率
+                # 單日匯率漲跌幅定義：(今日匯率 - 昨日匯率) / 昨日匯率
                 fx_change = ((curr / prev) - 1) * 100
     except:
         pass
@@ -227,7 +227,7 @@ def fetch_country_data(code, info):
         "指數點位": round(price, 2) if price else None,
         "單日漲跌幅 (%)": round(pct_change, 2) if pct_change else None,
         "年初至今報酬 (%)": round(ytd_change, 2) if ytd_change else None,
-        "匯率漲跌幅 (%)": round(fx_change, 2) if fx_change is not None else None # 修改這裡
+        "單日單日匯率漲跌幅 (%)": round(fx_change, 2) if fx_change is not None else None # 修改這裡
     }
 
 # =========================================================
@@ -249,7 +249,7 @@ def build_dataset():
         "指數點位", 
         "單日漲跌幅 (%)", 
         "年初至今報酬 (%)", 
-        "匯率漲跌幅 (%)"  # 這裡要確認是否已改名
+        "單日匯率漲跌幅 (%)"  # 這裡要確認是否已改名
     ]
     
     # 這裡增加一個過濾，避免因為欄位不存在而報錯
@@ -282,7 +282,7 @@ continent_filter = st.sidebar.selectbox(
 # sidebar 選項要與字典中的 Key 嚴格對應
 metric = st.sidebar.selectbox(
     "選擇地圖指標",
-    ["單日漲跌幅 (%)", "年初至今報酬 (%)", "匯率漲跌幅 (%)", "指數點位"]
+    ["單日漲跌幅 (%)", "年初至今報酬 (%)", "單日匯率漲跌幅 (%)", "指數點位"]
 )
 
 # =========================================================
