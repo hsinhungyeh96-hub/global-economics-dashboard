@@ -26,29 +26,40 @@ client = OpenAI(
 @st.cache_data(ttl=86400)
 def get_ai_summary(news_titles, date_str):
     if not news_titles:
-        return "暫無新聞。"
+        return "⚠️ 目前無相關新聞，無法進行分析。"
     
+    # 強制規定輸出格式
     prompt = f"""
-    今天是 {date_str}，以下是關於該國經濟的即時新聞標題：
-    {', '.join(news_titles)}
-    
-    請以專業財經分析師角度提供簡短分析：
-    1. 【市場焦點】：一句話總結今日主要趨勢。
-    2. 【潛在影響】：對股市與匯率的影響預測。
+    今天是 {date_str}，請針對以下新聞標題進行財經總結。
+    請嚴格遵守以下格式輸出，不要包含任何開場白或結語：
+
+    ---
+    ### 🎯 市場焦點
+    (一句話精準總結今日主要趨勢，限 30 字內)
+
+    ### 📈 潛在影響預測
+    * **股市動向**：(分析對大盤指數的影響)
+    * **貨幣走勢**：(分析匯率可能的變動方向)
+
+    ### ⚠️ 風險提示
+    (簡述最關鍵的一個風險點)
+    ---
+
+    新聞標題：{', '.join(news_titles)}
     """
     
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat", # DeepSeek 的模型名稱
+            model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是一位資深的全球總經分析師，請提供專業且客觀的市場洞察。"},
+                {"role": "system", "content": "你是一位專業的財經分析師，請務必按照使用者要求的格式輸出，使用繁體中文。"},
                 {"role": "user", "content": prompt}
             ],
             stream=False
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"AI 分析暫時無法取得: {e}"
+        return f"AI 分析服務暫時無法取得。"
 
 # =========================================================
 # 🌍 基礎設定
@@ -365,12 +376,12 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
         else:
             # --- AI 分析區塊 (現在台灣也會執行) ---
             titles = [item['title'] for item in news_items]
-            with st.expander(f"🤖 AI 每日市場總結 ({datetime.date.today().strftime('%Y-%m-%d')})", expanded=True):
-                with st.spinner("AI 正在分析市場動態..."):
-                    today = datetime.date.today().strftime("%Y-%m-%d")
-                    # 直接呼叫 AI
-                    summary = get_ai_summary(titles, today)
-                    st.markdown(summary)
+          with st.container(border=True): # 加入邊框，讓格式更穩固
+               st.markdown("### 🤖 每日市場總結")
+          with st.spinner("AI 正在整理報告..."):
+               today = datetime.date.today().strftime("%Y-%m-%d")
+               summary = get_ai_summary(titles, today)
+               st.markdown(summary)
             
             st.divider() 
             for item in news_items:
