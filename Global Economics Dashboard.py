@@ -360,7 +360,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # =========================================================
-# 📰 財經新聞 
+# 📰 財經新聞 (優化版：字體固定與格式統一)
 # =========================================================
 st.header("📰 全球即時財經新聞")
 
@@ -377,16 +377,24 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
             # --- AI 分析區塊 ---
             titles = [item['title'] for item in news_items]
             
-            with st.container(border=True): # 這裡修正了縮排，與 titles 對齊
+            with st.container(border=True): 
                 st.markdown("### 🤖 每日市場總結")
                 with st.spinner("AI 正在整理報告..."):
                     today = datetime.date.today().strftime("%Y-%m-%d")
                     summary = get_ai_summary(titles, today)
-                    st.markdown(summary)
+                    
+                    # 透過 HTML div 強制固定字體大小與行距，確保視覺統一
+                    st.markdown(f"""
+                    <div style="font-size: 14px; line-height: 1.6; color: #333;">
+                        {summary}
+                    </div>
+                    """, unsafe_allow_html=True)
             
             st.divider() 
+            # 顯示新聞列表 (移除標題格式影響，確保頁面整潔)
             for item in news_items:
-                st.markdown(f"### [{item['title']}]({item['link']}) \n ⏱️ {item['date']}")
+                st.markdown(f"[{item['title']}]({item['link']})")
+                st.caption(f"⏱️ {item['date']}")
 
 # =========================================================
 # 📌 Footer
