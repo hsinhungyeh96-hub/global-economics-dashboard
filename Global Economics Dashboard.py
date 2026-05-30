@@ -347,30 +347,33 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # =========================================================
-# 📰 財經新聞
+# 📰 財經新聞 (修正版：針對台灣跳過 AI 分析)
 # =========================================================
 st.header("📰 全球即時財經新聞")
 
 tab_names = [info["名稱"] for info in COUNTRY_CONFIG.values()]
 tabs = st.tabs(tab_names)
 
-for tab, (_, info) in zip(tabs, COUNTRY_CONFIG.items()):
+for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
     with tab:
         news_items = get_news(info["新聞"])
         
         if not news_items:
             st.warning("目前無新聞")
         else:
-            # --- 新增 AI 分析區塊 ---
-            titles = [item['title'] for item in news_items]
-            with st.expander("🤖 AI 每日新聞總結與分析", expanded=True):
-                with st.spinner("AI 正在分析市場動態..."):
-                    today = datetime.date.today().strftime("%Y-%m-%d")
-                    summary = get_ai_summary(titles, today)
-                    st.markdown(summary)
-            # -----------------------
+            # --- 修改邏輯：如果是台灣，則跳過 AI 分析 ---
+            if code == "TWN":
+                st.info("ℹ️ 台灣市場財經新聞連結：")
+            else:
+                titles = [item['title'] for item in news_items]
+                with st.expander(f"🤖 AI 每日市場總結 ({datetime.date.today().strftime('%Y-%m-%d')})", expanded=True):
+                    with st.spinner("AI 正在分析市場動態..."):
+                        today = datetime.date.today().strftime("%Y-%m-%d")
+                        summary = get_ai_summary(titles, today)
+                        st.markdown(summary)
+            # ----------------------------------------
             
-            st.divider() # 加入分隔線
+            st.divider() 
             for item in news_items:
                 st.markdown(f"### [{item['title']}]({item['link']}) \n ⏱️ {item['date']}")
 
