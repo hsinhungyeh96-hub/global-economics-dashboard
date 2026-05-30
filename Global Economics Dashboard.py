@@ -76,13 +76,15 @@ session.headers.update({
 # =========================================================
 @st.cache_data(ttl=300) # 5分鐘快取
 def fetch_live_market_data(ticker_symbol, currency_pair):
-    price, pct_change, rate = None, None, None
+    # 預設所有回傳值為 None
+    price, pct_change, ytd_change, rate = None, None, None, None
     
+    # 1. 抓取股市 (包含單日與 YTD)
     try:
-        # 股市數據擷取 (抓取過去5天以確保能計算單日漲跌幅)
         stock = yf.Ticker(ticker_symbol)
-        hist = stock.history(period="5d")
         
+        # 單日漲跌幅計算
+        hist = stock.history(period="5d")
         if len(hist) >= 2:
             price = hist['Close'].iloc[-1]
             prev_price = hist['Close'].iloc[-2]
@@ -90,7 +92,17 @@ def fetch_live_market_data(ticker_symbol, currency_pair):
         elif not hist.empty:
             price = hist['Close'].iloc[-1]
 
-        # 匯率數據擷取
+        # YTD (年初至今報酬率) 計算
+        ytd_hist = stock.history(period="ytd")
+        if not ytd_hist.empty and len(ytd_hist) > 1 and price is not None:
+            first_price_this_year = ytd_hist['Close'].iloc[0]
+            ytd_change = ((price / first_price_this_year) - 1) * 100
+            
+    except Exception as e:
+        print(f"股市抓取失敗 {ticker_symbol}: {e}")
+
+    # 2. 抓取匯率
+    try:
         if currency_pair == "USD=X":
             rate = 1.0
         else:
@@ -98,11 +110,11 @@ def fetch_live_market_data(ticker_symbol, currency_pair):
             fx_hist = fx.history(period="1d")
             if not fx_hist.empty:
                 rate = fx_hist['Close'].iloc[-1]
-                
     except Exception as e:
-        pass # 實務上可以將錯誤寫入日誌
+        print(f"匯率抓取失敗 {currency_pair}: {e}")
 
-    return price, pct_change, rate
+    # 回傳 4 個值
+    return price, pct_change, ytd_change, rate
 
 # =========================================================
 # 📰 新聞 (保持原樣)
@@ -136,7 +148,8 @@ def get_news(keyword):
 # 🌎 單國資料組裝
 # =========================================================
 def fetch_country_data(code, info):
-    price, pct_change, rate = fetch_live_market_data(info["指數"], info["匯率"])
+    # 這裡必須多加 ytd_change 來接收回傳值
+    price, pct_change, ytd_change, rate = fetch_live_market_data(info["指數"], info["匯率"])
 
     return {
         "國家代碼": code,
@@ -145,6 +158,7 @@ def fetch_country_data(code, info):
         "代表指數": info["指數"],
         "指數點位": round(price, 2) if price else None,
         "單日漲跌幅 (%)": round(pct_change, 2) if pct_change else None,
+        "年初至今報酬 (%)": round(ytd_change, 2) if ytd_change else None, # 新增這個欄位
         "匯率 (兌 USD)": round(rate, 4) if rate else None
     }
 
@@ -168,7 +182,7 @@ def build_dataset():
             rows.append(future.result())
 
     df = pd.DataFrame(rows)
-    numeric_cols = ["指數點位", "單日漲跌幅 (%)", "匯率 (兌 USD)"]
+    numeric_cols = ["指數點位", "單日漲跌幅 (%)", "年初至今報酬 (%)", "匯率 (兌 USD)"]
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
