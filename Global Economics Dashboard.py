@@ -186,28 +186,35 @@ def fetch_global_metrics():
 # =========================================================
 @st.cache_data(ttl=1800)
 def get_news(keyword):
-    try:
-        url = (
-            f"https://news.google.com/rss/search?"
-            f"q={keyword}&hl=en-US&gl=US&ceid=US:en"
-        )
-        response = session.get(url, timeout=10)
-        response.raise_for_status()
-        root = ET.fromstring(response.content)
-
-        news = []
-        for item in root.findall(".//item")[:5]:
-            title = item.find("title").text
-            link = item.find("link").text
-            pub_date = item.find("pubDate").text
-            news.append({
-                "title": title,
-                "link": link,
-                "date": pub_date[:16]
-            })
-        return news
-    except:
-        return []
+    # 定義每個國家的主要關鍵字與備用關鍵字
+    search_queries = {
+        "Taiwan economy": ["Taiwan stock market", "Taiex"],
+        "China economy": ["China stock market", "Shanghai composite"],
+        # 其他國家也可以依此類推
+    }
+    
+    # 嘗試抓取的關鍵字清單
+    keywords_to_try = [keyword] + search_queries.get(keyword, [])
+    
+    for kw in keywords_to_try:
+        try:
+            url = f"https://news.google.com/rss/search?q={kw}&hl=en-US&gl=US&ceid=US:en"
+            response = session.get(url, timeout=10)
+            if response.status_code == 200:
+                root = ET.fromstring(response.content)
+                items = root.findall(".//item")
+                if items:
+                    news = []
+                    for item in items[:5]:
+                        news.append({
+                            "title": item.find("title").text,
+                            "link": item.find("link").text,
+                            "date": item.find("pubDate").text[:16]
+                        })
+                    return news
+        except:
+            continue
+    return [] # 真的都抓不到才回傳空
 
 # =========================================================
 # 🌎 單國資料組裝
