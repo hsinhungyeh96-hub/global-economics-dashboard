@@ -44,6 +44,7 @@ COUNTRY_CONFIG = {
     "KOR": {"名稱": "韓國", "洲": "亞洲", "匯率": "KRW=X", "指數": "^KS11", "新聞": "South Korea economy"},
     "IND": {"名稱": "印度", "洲": "亞洲", "匯率": "INR=X", "指數": "^BSESN", "新聞": "India economy"},
     "TWN": {"名稱": "台灣", "洲": "亞洲", "匯率": "TWD=X", "指數": "^TWII", "新聞": "Taiwan economy"},
+    "SGP": {"名稱": "新加坡", "洲": "亞洲", "匯率": "SGD=X", "指數": "^STI", "新聞": "Singapore economy"},
 
     # 南美
     "BRA": {"名稱": "巴西", "洲": "南美", "匯率": "BRL=X", "指數": "^BVSP", "新聞": "Brazil economy"},
@@ -55,7 +56,11 @@ COUNTRY_CONFIG = {
 
     # 中東
     "SAU": {"名稱": "沙烏地阿拉伯", "洲": "中東", "匯率": "SAR=X", "指數": "KSA", "新聞": "Saudi Arabia economy"},
-    "TUR": {"名稱": "土耳其", "洲": "中東", "匯率": "TRY=X", "指數": "XU100.IS", "新聞": "Turkey economy"}
+    "TUR": {"名稱": "土耳其", "洲": "中東", "匯率": "TRY=X", "指數": "XU100.IS", "新聞": "Turkey economy"},
+
+    # 大洋洲 (全新區塊)
+    "AUS": {"名稱": "澳洲", "洲": "大洋洲", "匯率": "AUD=X", "指數": "^AXJO", "新聞": "Australia economy"},
+    "NZL": {"名稱": "紐西蘭", "洲": "大洋洲", "匯率": "NZD=X", "指數": "^NZ50", "新聞": "New Zealand economy"},
 }
 
 # =========================================================
@@ -186,7 +191,7 @@ if st.sidebar.button("🔄 強制刷新數據"):
 
 continent_filter = st.sidebar.selectbox(
     "選擇洲別",
-    ["全部", "北美", "歐洲", "亞洲", "南美", "非洲", "中東"]
+    ["全部", "北美", "歐洲", "亞洲", "南美", "非洲", "中東", "大洋洲"]
 )
 
 metric = st.sidebar.selectbox(
