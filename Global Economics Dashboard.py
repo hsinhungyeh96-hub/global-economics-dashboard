@@ -382,7 +382,11 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
                 with st.spinner("AI 正在整理報告..."):
                     today = datetime.date.today().strftime("%Y-%m-%d")
                     summary = get_ai_summary(titles, today)
-                    st.markdown(summary)
+                    st.markdown(f"""
+        <div style="font-size: 14px; line-height: 1.6; color: #333;">
+            {summary}
+        </div>
+        """, unsafe_allow_html=True)
             
             st.divider() 
             for item in news_items:
