@@ -51,10 +51,10 @@ COUNTRY_CONFIG = {
 
     # 非洲
     "ZAF": {"名稱": "南非", "洲": "非洲", "匯率": "ZAR=X", "指數": "^J203.JO", "新聞": "South Africa economy"},
-    "EGY": {"名稱": "埃及", "洲": "非洲", "匯率": "EGP=X", "指數": "EGX30.CA", "新聞": "Egypt economy"},
+    "EGY": {"名稱": "埃及", "洲": "非洲", "匯率": "EGP=X", "指數": "EGPT", "新聞": "Egypt economy"},
 
     # 中東
-    "SAU": {"名稱": "沙烏地阿拉伯", "洲": "中東", "匯率": "SAR=X", "指數": "^TASI.SR", "新聞": "Saudi Arabia economy"},
+    "SAU": {"名稱": "沙烏地阿拉伯", "洲": "中東", "匯率": "SAR=X", "指數": "KSA", "新聞": "Saudi Arabia economy"},
     "TUR": {"名稱": "土耳其", "洲": "中東", "匯率": "TRY=X", "指數": "XU100.IS", "新聞": "Turkey economy"}
 }
 
