@@ -368,33 +368,61 @@ tab_names = [info["名稱"] for info in COUNTRY_CONFIG.values()]
 tabs = st.tabs(tab_names)
 
 for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
+
     with tab:
+
         news_items = get_news(info["新聞"])
-        
+
         if not news_items:
             st.warning("目前無新聞")
+
         else:
-            # --- AI 分析區塊 ---
-            titles = [item['title'] for item in news_items]
-            
-            with st.container(border=True): 
+
+            # ==============================
+            # AI 市場總結
+            # ==============================
+            titles = [item["title"] for item in news_items]
+
+            with st.container(border=True):
+
                 st.markdown("### 🤖 每日市場總結")
+
                 with st.spinner("AI 正在整理報告..."):
+
                     today = datetime.date.today().strftime("%Y-%m-%d")
                     summary = get_ai_summary(titles, today)
-                    
-                    # 透過 HTML div 強制固定字體大小與行距，確保視覺統一
-                    st.markdown(f"""
-                    <div style="font-size: 14px; line-height: 1.6; color: #333;">
+
+                    # 避免 AI 回傳奇怪 HTML
+                    summary = summary.replace("</div>", "")
+                    summary = summary.replace("<div>", "")
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                            font-size:14px;
+                            line-height:1.6;
+                            color:#333333;
+                        ">
                         {summary}
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            st.divider() 
-            # 顯示新聞列表 (移除標題格式影響，確保頁面整潔)
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+            st.divider()
+
+            # ==============================
+            # 新聞列表
+            # ==============================
             for item in news_items:
-                st.markdown(f"[{item['title']}]({item['link']})")
-                st.caption(f"⏱️ {item['date']}")
+
+                st.markdown(
+                    f"🔹 [{item['title']}]({item['link']})"
+                )
+
+                st.caption(
+                    f"⏱️ {item['date']}"
+                )
 
 # =========================================================
 # 📌 Footer
