@@ -360,7 +360,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # =========================================================
-# 📰 財經新聞 (修正版：針對台灣跳過 AI 分析)
+# 📰 財經新聞 
 # =========================================================
 st.header("📰 全球即時財經新聞")
 
@@ -374,14 +374,15 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
         if not news_items:
             st.warning("目前無新聞")
         else:
-            # --- AI 分析區塊 (現在台灣也會執行) ---
+            # --- AI 分析區塊 ---
             titles = [item['title'] for item in news_items]
-          with st.container(border=True): # 加入邊框，讓格式更穩固
-            st.markdown("### 🤖 每日市場總結")
-            with st.spinner("AI 正在整理報告..."):
-               today = datetime.date.today().strftime("%Y-%m-%d")
-               summary = get_ai_summary(titles, today)
-               st.markdown(summary)
+            
+            with st.container(border=True): # 這裡修正了縮排，與 titles 對齊
+                st.markdown("### 🤖 每日市場總結")
+                with st.spinner("AI 正在整理報告..."):
+                    today = datetime.date.today().strftime("%Y-%m-%d")
+                    summary = get_ai_summary(titles, today)
+                    st.markdown(summary)
             
             st.divider() 
             for item in news_items:
