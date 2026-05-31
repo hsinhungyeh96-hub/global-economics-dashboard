@@ -328,7 +328,11 @@ st.sidebar.header("⚙️ Dashboard 控制台")
 
 # 手動刷新按鈕
 if st.sidebar.button("🔄 強制刷新數據"):
-    st.cache_data.clear()
+    # 只精準清除「報價與組裝資料」的快取，絕對不動 AI 與新聞的快取！
+    fetch_live_market_data.clear()
+    fetch_global_metrics.clear()
+    build_dataset.clear()
+    
     st.rerun()
 
 continent_filter = st.sidebar.selectbox(
