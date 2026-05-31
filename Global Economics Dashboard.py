@@ -28,46 +28,90 @@ client = OpenAI(
     base_url="https://api.deepseek.com"
 )
 
-@st.cache_data(ttl=86400)
-def get_ai_summary(_news_titles, country_code, date_str):
-    if not _news_titles:
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_ai_summary(country_code, date_str):
+
+    info = COUNTRY_CONFIG[country_code]
+
+    news_items = get_news(info["新聞"])
+
+    if not news_items:
         return None
-    
+
+    news_titles = [
+        item["title"]
+        for item in news_items[:5]
+    ]
+
     prompt = f"""
-    今天是 {date_str}，請針對以下新聞進行財經總結。
-    請務必使用【繁體中文】輸出。
-    請僅輸出純 JSON 字串，不要包含任何 ```json 或 ``` 標記，也不要包含任何文字解釋。
-    {{
-        "market_focus": "一句話總結市場焦點，30字內",
-        "stock_outlook": "股市動向分析",
-        "currency_outlook": "匯率變動方向",
-        "risk_tip": "關鍵風險提示"
-    }}
-    新聞標題：{', '.join(_news_titles)}
-    """
-    
+今天是 {date_str}。
+
+請根據以下新聞標題，
+分析該國今日市場狀況。
+
+請務必使用繁體中文。
+
+請只輸出 JSON：
+
+{{
+    "market_focus":"一句話市場焦點",
+    "stock_outlook":"股市動向分析",
+    "currency_outlook":"匯率方向分析",
+    "risk_tip":"風險提示"
+}}
+
+新聞標題：
+
+{chr(10).join(news_titles)}
+"""
+
     try:
+
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是一位專業的財經分析師。請始終使用繁體中文進行分析。請只輸出 JSON，不要輸出任何 Markdown 格式或額外對話。"},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content":
+                    "你是一位專業總經分析師，只能輸出 JSON。"
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
             ],
             stream=False
         )
-        
-        content = response.choices[0].message.content.strip()
-        content = content.replace("```json", "").replace("```", "").strip()
-        
+
+        content = (
+            response
+            .choices[0]
+            .message
+            .content
+            .strip()
+        )
+
+        content = (
+            content
+            .replace("```json", "")
+            .replace("```", "")
+            .strip()
+        )
+
         data = json.loads(content)
-        
-        for key, value in data.items():
-            if isinstance(value, str):
-                data[key] = cc.convert(value)
-            
+
+        for k, v in data.items():
+
+            if isinstance(v, str):
+
+                data[k] = cc.convert(v)
+
         return data
+
     except Exception as e:
+
         print(f"AI Summary Error: {e}")
+
         return None
 
 # =========================================================
@@ -389,68 +433,129 @@ fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
 st.plotly_chart(fig_map, use_container_width=True)
 
 # =========================================================
-# 📰 財經新聞與 AI 節流加載系統 (優化版：支持一鍵批量更新)
+# 📰 財經新聞與 AI 每日快取系統
 # =========================================================
-st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 AI 自動化控制")
-if st.sidebar.button("🚀 更新當前洲別所有 AI 報告"):
-    # 遍歷目前篩選結果，將所有國家設為已觸發
-    for code in filtered_df["國家代碼"]:
-        st.session_state.ai_triggered[code] = True
-    st.rerun()
 
 st.header("📰 全球即時財經新聞")
 
-# 初始化 Session State
-if "ai_triggered" not in st.session_state:
-    st.session_state.ai_triggered = {code: False for code in COUNTRY_CONFIG}
-
 # 根據篩選器過濾出要顯示的國家
-display_countries = {k: v for k, v in COUNTRY_CONFIG.items() if continent_filter == "全部" or v["洲"] == continent_filter}
-tab_names = [info["名稱"] for info in display_countries.values()]
+display_countries = {
+    k: v
+    for k, v in COUNTRY_CONFIG.items()
+    if continent_filter == "全部" or v["洲"] == continent_filter
+}
+
+tab_names = [
+    info["名稱"]
+    for info in display_countries.values()
+]
+
 tabs = st.tabs(tab_names)
 
-for tab, (code, info) in zip(tabs, display_countries.items()):
-    with tab:
-        news_items = get_news(info["新聞"])
-        if not news_items:
-            st.warning("目前無新聞")
-        else:
-            titles = [item['title'] for item in news_items]
-            st.markdown("### 🤖 每日市場總結")
-            
-            # 狀態檢查：如果是觸發狀態，直接顯示 AI 分析
-            if st.session_state.ai_triggered.get(code, False):
-                with st.spinner(f"AI 正在分析 {info['名稱']} 市場趨勢..."):
-                    today = datetime.date.today().strftime("%Y-%m-%d")
-                    summary = get_ai_summary(titles, code, today)
-                
-                if summary:
-                    with st.container(border=True):
-                        st.write(f"📅 **分析日期：** {today}")
-                        st.write(f"🎯 **市場焦點：** {summary['market_focus']}")
-                        col1, col2 = st.columns([1, 1])
-                        with col1:
-                            st.markdown("**📈 股市動向：**")
-                            st.info(summary['stock_outlook']) 
-                        with col2:
-                            st.markdown("**💰 匯率走勢：**")
-                            st.info(summary['currency_outlook'])
-                        st.markdown("**⚠️ 風險提示：**")
-                        st.warning(summary['risk_tip'])
-                else:
-                    st.error("AI 分析暫時無法取得。")
-            else:
-                # 尚未觸發時顯示按鈕
-                if st.button(f"🧠 生成 {info['名稱']} 的 AI 深度趨勢報告", key=f"btn_{code}"):
-                    st.session_state.ai_triggered[code] = True
-                    st.rerun()
-                
-            st.divider()
-            st.markdown("### 📰 最新頭條")
-            for item in news_items:
-                st.markdown(f"**[{item['title']}]({item['link']})** \n ⏱️ {item['date']}")
+for tab, (code, info) in zip(
+    tabs,
+    display_countries.items()
+):
 
+    with tab:
+
+        news_items = get_news(
+            info["新聞"]
+        )
+
+        if not news_items:
+
+            st.warning(
+                "目前無新聞"
+            )
+
+        else:
+
+            st.markdown(
+                "### 🤖 每日市場總結"
+            )
+
+            today = (
+                datetime.date.today()
+                .strftime("%Y-%m-%d")
+            )
+
+            with st.spinner(
+                "AI 分析中..."
+            ):
+
+                summary = get_ai_summary(
+                    code,
+                    today
+                )
+
+            if summary:
+
+                with st.container(
+                    border=True
+                ):
+
+                    st.write(
+                        f"📅 **分析日期：** {today}"
+                    )
+
+                    st.write(
+                        f"🎯 **市場焦點：** "
+                        f"{summary['market_focus']}"
+                    )
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+
+                        st.markdown(
+                            "**📈 股市動向：**"
+                        )
+
+                        st.info(
+                            summary[
+                                "stock_outlook"
+                            ]
+                        )
+
+                    with col2:
+
+                        st.markdown(
+                            "**💰 匯率走勢：**"
+                        )
+
+                        st.info(
+                            summary[
+                                "currency_outlook"
+                            ]
+                        )
+
+                    st.markdown(
+                        "**⚠️ 風險提示：**"
+                    )
+
+                    st.warning(
+                        summary["risk_tip"]
+                    )
+
+            else:
+
+                st.error(
+                    "AI 分析暫時無法取得"
+                )
+
+            st.divider()
+
+            st.markdown(
+                "### 📰 最新頭條"
+            )
+
+            for item in news_items:
+
+                st.markdown(
+                    f"**[{item['title']}]({item['link']})**\n\n"
+                    f"⏱️ {item['date']}"
+                )
 # =========================================================
 # 📌 Footer
 # =========================================================
