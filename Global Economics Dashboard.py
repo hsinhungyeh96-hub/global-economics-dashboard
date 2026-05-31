@@ -27,7 +27,6 @@ client = OpenAI(
     api_key=api_key, 
     base_url="https://api.deepseek.com"
 )
-import json
 
 @st.cache_data(ttl=86400)
 def get_ai_summary(_news_titles, country_code, date_str):
@@ -220,66 +219,6 @@ def fetch_global_metrics():
             
     return results
 
-# =========================================================
-# 🧠 Market Regime Engine V2.5
-# =========================================================
-def classify_market_regime_v25(metrics):
-
-    vix = metrics["恐慌指數 (VIX)"]
-    gold = metrics["黃金 (Gold)"]
-    oil = metrics["原油 (Crude Oil)"]
-    yield10 = metrics["10年期美債殖利率"]
-    spx = metrics["標普500 (S&P500)"]
-
-    vix_d = vix["delta"]
-    gold_d = gold["delta"]
-    oil_d = oil["delta"]
-    y_d = yield10["delta"]
-    spx_d = spx["delta"]
-
-    # ---------------------------
-    # 🔴 Crisis / Risk-Off
-    # ---------------------------
-    if vix_d > 0 and spx_d < 0:
-        return (
-            "🔴 Risk-Off / Stress",
-            "股市下跌 + 波動上升，資金轉向避險資產"
-        )
-
-    # ---------------------------
-    # 🟠 Inflation Regime
-    # ---------------------------
-    if oil_d > 0 and y_d > 0 and gold_d > 0:
-        return (
-            "🟠 Inflation Regime",
-            "能源與利率同步上升，市場交易通膨壓力"
-        )
-
-    # ---------------------------
-    # 🟡 Slowdown / Recession Risk
-    # ---------------------------
-    if spx_d < 0 and oil_d < 0 and y_d < 0:
-        return (
-            "🟡 Slowdown / Recession Risk",
-            "股市與商品下跌，利率回落，成長預期轉弱"
-        )
-
-    # ---------------------------
-    # 🟢 Risk-On
-    # ---------------------------
-    if spx_d > 0 and vix_d < 0:
-        return (
-            "🟢 Risk-On",
-            "風險偏好回升，股市主導資金流"
-        )
-
-    # ---------------------------
-    # ⚪ Mixed
-    # ---------------------------
-    return (
-        "⚪ Mixed Regime",
-        "市場訊號分歧，尚未形成一致敘事"
-    )
 
 # =========================================================
 # 🧠 Market Regime Probability Engine V3
@@ -542,6 +481,7 @@ df_prob = pd.DataFrame({
     "機率 (%)": list(probs.values())
 })
 
+# 刪除重複的 color_map，只保留一個
 color_map = {
     "🟢 Risk-On": "#2ECC71",
     "🟠 Inflation": "#F39C12",
@@ -549,14 +489,7 @@ color_map = {
     "🔴 Stress": "#E74C3C"
 }
 
-color_map = {
-    "🟢 Risk-On": "#2ECC71",
-    "🟠 Inflation": "#F39C12",
-    "🟡 Recession": "#F1C40F",
-    "🔴 Stress": "#E74C3C"
-}
-
-fig = px.bar(
+fig_prob = px.bar(
     df_prob,
     x="市場狀態",
     y="機率 (%)",
@@ -564,6 +497,11 @@ fig = px.bar(
     color="市場狀態",
     color_discrete_map=color_map
 )
+
+fig_prob.update_layout(showlegend=False) # 隱藏圖例讓版面更簡潔
+
+# ⚠️ 修正：加上這一行，圖表才會真正顯示在 Streamlit 畫面上！
+st.plotly_chart(fig_prob, use_container_width=True)
 
 # =========================================================
 # 📋 Data Table
