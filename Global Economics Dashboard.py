@@ -556,14 +556,8 @@ df_prob = pd.DataFrame({
     "機率 (%)": list(probs.values())
 })
 
-color_map = {
-    "🟢 風險偏好": "#2ECC71",
-    "🟠 通膨環境": "#F39C12",
-    "🟡 經濟放緩": "#F1C40F",
-    "🔴 市場壓力": "#E74C3C"
-}
 
-st.markdown("### 🧠 Regime 含義")
+st.markdown("### -Regime 含義-")
 
 st.markdown("""
 - 🟢 **風險偏好**：股市上漲 + 波動下降 → 風險資產受青睞  
@@ -578,7 +572,12 @@ fig = px.pie(
     values="機率 (%)",
     hole=0.45,
     color="市場狀態",
-    color_discrete_map=color_map
+    color_discrete_map={
+        "🟢 風險偏好": "#2ECC71",
+        "🟠 通膨環境": "#F39C12",
+        "🟡 經濟放緩": "#F1C40F",
+        "🔴 市場壓力": "#E74C3C"
+    }
 )
 
 fig.update_traces(
@@ -586,7 +585,10 @@ fig.update_traces(
     hovertemplate="%{label}<br>%{value:.1f}%<extra></extra>"
 )
 
-st.plotly_chart(fig, use_container_width=True)
+# 🚫 關掉 legend（重點）
+fig.update_layout(
+    showlegend=False
+)
 
 # =========================================================
 # 📋 Data Table
