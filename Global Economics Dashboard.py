@@ -292,41 +292,51 @@ def compute_regime_probabilities(metrics):
     y10 = metrics["10年期美債殖利率"]["delta"]
     spx = metrics["標普500 (S&P500)"]["delta"]
 
- scores = {
-    "🟢 Risk-On": 0,
-    "🟠 Inflation": 0,
-    "🟡 Recession": 0,
-    "🔴 Stress": 0
-}
+    scores = {
+        "🟢 Risk-On": 0,
+        "🟠 Inflation": 0,
+        "🟡 Recession": 0,
+        "🔴 Stress": 0
+    }
 
     # ---------------- Risk-On ----------------
-    if spx > 0: scores["🟢 Risk-On"] += 2
-    if vix < 0: scores["🟢 Risk-On"] += 2
-    if gold < 0: scores["🟢 Risk-On"] += 1
+    if spx > 0:
+        scores["🟢 Risk-On"] += 2
+    if vix < 0:
+        scores["🟢 Risk-On"] += 2
+    if gold < 0:
+        scores["🟢 Risk-On"] += 1
 
     # ---------------- Inflation ----------------
-    if oil > 0: scores["🟠 Inflation"] += 2
-    if y10 > 0: scores["🟠 Inflation"] += 2
-    if gold > 0: scores["🟠 Inflation"] += 1
+    if oil > 0:
+        scores["🟠 Inflation"] += 2
+    if y10 > 0:
+        scores["🟠 Inflation"] += 2
+    if gold > 0:
+        scores["🟠 Inflation"] += 1
 
     # ---------------- Recession ----------------
-    if spx < 0: scores["🟡 Recession"] += 2
-    if oil < 0: scores["🟡 Recession"] += 1
-    if y10 < 0: scores["🟡 Recession"] += 1
+    if spx < 0:
+        scores["🟡 Recession"] += 2
+    if oil < 0:
+        scores["🟡 Recession"] += 1
+    if y10 < 0:
+        scores["🟡 Recession"] += 1
 
-    # ---------------- Stress / Risk-Off ----------------
-    if vix > 0: scores["🔴 Stress"] += 2
-    if spx < 0 and vix > 0: scores["🔴 Stress"] += 2
-    if gold > 0: scores["🔴 Stress"] += 1
+    # ---------------- Stress ----------------
+    if vix > 0:
+        scores["🔴 Stress"] += 2
+    if spx < 0 and vix > 0:
+        scores["🔴 Stress"] += 2
+    if gold > 0:
+        scores["🔴 Stress"] += 1
 
-    # normalize → probability
     total = sum(scores.values())
+
     if total == 0:
         return {k: 0 for k in scores}
 
-    probs = {k: round(v / total * 100, 1) for k, v in scores.items()}
-
-    return probs
+    return {k: round(v / total * 100, 1) for k, v in scores.items()}
 # =========================================================
 # 📰 新聞 (保持原樣)
 # =========================================================
