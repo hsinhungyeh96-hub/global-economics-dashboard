@@ -10,6 +10,7 @@ from openai import OpenAI
 import json
 from opencc import OpenCC
 import numpy as np
+from deep_translator import GoogleTranslator
 
 # 初始化 OpenCC (繁簡轉換)
 cc = OpenCC('s2t')
@@ -29,6 +30,25 @@ client = OpenAI(
 )
 
 @st.cache_data(ttl=86400, show_spinner=False)
+def translate_text(text, target_lang):
+
+    if not text:
+
+        return text
+
+    try:
+
+        return GoogleTranslator(
+
+            source="auto",
+
+            target=target_lang
+
+        ).translate(text)
+
+    except Exception:
+
+        return text
 def get_ai_summary(country_code, date_str):
 
     info = COUNTRY_CONFIG[country_code]
@@ -360,6 +380,32 @@ with st.spinner("🌍 全球即時市場數據同步中..."):
     df = build_dataset()
 
 st.sidebar.header("⚙️ Dashboard 控制台")
+language = st.sidebar.selectbox(
+    "🌐 Language",
+    [
+        "繁體中文",
+        "English"
+    ]
+)
+def translate_text(text, target_lang):
+
+    if not text:
+
+        return text
+
+    try:
+
+        return GoogleTranslator(
+
+            source="auto",
+
+            target=target_lang
+
+        ).translate(text)
+
+    except Exception:
+
+        return text
 if st.sidebar.button("🔄 強制刷新數據"):
     fetch_live_market_data.clear()
     fetch_global_metrics.clear()
@@ -436,13 +482,46 @@ st.plotly_chart(fig_map, use_container_width=True)
 # 📰 財經新聞與 AI 每日快取系統
 # =========================================================
 
+language = st.sidebar.selectbox(
+    "🌐 Language",
+    [
+        "繁體中文",
+        "English"
+    ]
+)
+
+TEXT = {
+    "繁體中文": {
+        "summary": "🤖 每日市場總結",
+        "focus": "🎯 市場焦點",
+        "stock": "📈 股市動向",
+        "fx": "💰 匯率走勢",
+        "risk": "⚠️ 風險提示",
+        "news": "📰 最新頭條",
+        "no_news": "目前無新聞",
+        "ai_error": "AI 分析暫時無法取得",
+        "analyzing": "AI 分析中..."
+    },
+    "English": {
+        "summary": "🤖 Daily Market Summary",
+        "focus": "🎯 Market Focus",
+        "stock": "📈 Stock Outlook",
+        "fx": "💰 Currency Outlook",
+        "risk": "⚠️ Risk Warning",
+        "news": "📰 Latest Headlines",
+        "no_news": "No news available",
+        "ai_error": "AI summary unavailable",
+        "analyzing": "AI is analyzing..."
+    }
+}
+
 st.header("📰 全球即時財經新聞")
 
-# 根據篩選器過濾出要顯示的國家
 display_countries = {
     k: v
     for k, v in COUNTRY_CONFIG.items()
-    if continent_filter == "全部" or v["洲"] == continent_filter
+    if continent_filter == "全部"
+    or v["洲"] == continent_filter
 }
 
 tab_names = [
@@ -466,13 +545,13 @@ for tab, (code, info) in zip(
         if not news_items:
 
             st.warning(
-                "目前無新聞"
+                TEXT[language]["no_news"]
             )
 
         else:
 
             st.markdown(
-                "### 🤖 每日市場總結"
+                f"### {TEXT[language]['summary']}"
             )
 
             today = (
@@ -481,7 +560,7 @@ for tab, (code, info) in zip(
             )
 
             with st.spinner(
-                "AI 分析中..."
+                TEXT[language]["analyzing"]
             ):
 
                 summary = get_ai_summary(
@@ -491,17 +570,65 @@ for tab, (code, info) in zip(
 
             if summary:
 
+                # ====================================
+                # 翻譯 AI 內容
+                # ====================================
+
+                if language == "English":
+
+                    market_focus = translate_text(
+                        summary["market_focus"],
+                        "en"
+                    )
+
+                    stock_outlook = translate_text(
+                        summary["stock_outlook"],
+                        "en"
+                    )
+
+                    currency_outlook = translate_text(
+                        summary["currency_outlook"],
+                        "en"
+                    )
+
+                    risk_tip = translate_text(
+                        summary["risk_tip"],
+                        "en"
+                    )
+
+                else:
+
+                    market_focus = summary[
+                        "market_focus"
+                    ]
+
+                    stock_outlook = summary[
+                        "stock_outlook"
+                    ]
+
+                    currency_outlook = summary[
+                        "currency_outlook"
+                    ]
+
+                    risk_tip = summary[
+                        "risk_tip"
+                    ]
+
+                # ====================================
+                # 顯示 AI 分析
+                # ====================================
+
                 with st.container(
                     border=True
                 ):
 
                     st.write(
-                        f"📅 **分析日期：** {today}"
+                        f"📅 {today}"
                     )
 
                     st.write(
-                        f"🎯 **市場焦點：** "
-                        f"{summary['market_focus']}"
+                        f"{TEXT[language]['focus']}："
+                        f"{market_focus}"
                     )
 
                     col1, col2 = st.columns(2)
@@ -509,45 +636,41 @@ for tab, (code, info) in zip(
                     with col1:
 
                         st.markdown(
-                            "**📈 股市動向：**"
+                            f"**{TEXT[language]['stock']}**"
                         )
 
                         st.info(
-                            summary[
-                                "stock_outlook"
-                            ]
+                            stock_outlook
                         )
 
                     with col2:
 
                         st.markdown(
-                            "**💰 匯率走勢：**"
+                            f"**{TEXT[language]['fx']}**"
                         )
 
                         st.info(
-                            summary[
-                                "currency_outlook"
-                            ]
+                            currency_outlook
                         )
 
                     st.markdown(
-                        "**⚠️ 風險提示：**"
+                        f"**{TEXT[language]['risk']}**"
                     )
 
                     st.warning(
-                        summary["risk_tip"]
+                        risk_tip
                     )
 
             else:
 
                 st.error(
-                    "AI 分析暫時無法取得"
+                    TEXT[language]["ai_error"]
                 )
 
             st.divider()
 
             st.markdown(
-                "### 📰 最新頭條"
+                f"### {TEXT[language]['news']}"
             )
 
             for item in news_items:
