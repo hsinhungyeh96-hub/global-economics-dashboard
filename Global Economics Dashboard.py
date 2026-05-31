@@ -178,11 +178,11 @@ def fetch_live_market_data(ticker_symbol, currency_pair):
     return price, pct_change, ytd_change, fx_change
 
 # =========================================================
-# 🌎 全球核心總經指標抓取 (最終穩定版)
+# 🌎 全球核心總經指標抓取
 # =========================================================
 @st.cache_data(ttl=300)
 def fetch_global_metrics():
-    # 定義指標
+
     metrics = {
         "恐慌指數 (VIX)": "^VIX",
         "黃金 (Gold)": "GC=F",
@@ -190,38 +190,55 @@ def fetch_global_metrics():
         "10年期美債殖利率": "^TNX",
         "標普500 (S&P500)": "^GSPC"
     }
-    
+
     results = {}
+
     for name, ticker in metrics.items():
+
         try:
-            # 抓取近 5 天數據 (即便假日也會顯示最後交易日)
+
             data = yf.Ticker(ticker).history(period="5d")
-            
+
             if not data.empty and len(data) >= 1:
-                # 取得最新一筆價格
-                latest = data['Close'].iloc[-1]
-                
-                # 若有歷史數據(>=2)，則計算漲跌；若只有 1 筆，delta 設為 0
+
+                latest = data["Close"].iloc[-1]
+
+                # 改成百分比變化
                 if len(data) >= 2:
-                    prev = data['Close'].iloc[-2]
-                    delta = latest - prev
+
+                    prev = data["Close"].iloc[-2]
+
+                    pct_change = (
+                        (latest / prev) - 1
+                    ) * 100
+
                 else:
-                    delta = 0.0
-                
-                results[name] = {"val": latest, "delta": delta}
+                    pct_change = 0.0
+
+                results[name] = {
+                    "val": latest,
+                    "delta": pct_change
+                }
+
             else:
-                # 若完全沒資料，補上 0 避免區塊消失
-                results[name] = {"val": 0.0, "delta": 0.0}
-                
-        except Exception as e:
-            # 若發生錯誤，給予預設值，確保程式不中斷
-            results[name] = {"val": 0.0, "delta": 0.0}
-            
+
+                results[name] = {
+                    "val": 0.0,
+                    "delta": 0.0
+                }
+
+        except Exception:
+
+            results[name] = {
+                "val": 0.0,
+                "delta": 0.0
+            }
+
     return results
 
 
 # =========================================================
-# 🧠 Market Regime Probability Engine V3
+# 🧠 Market Regime Probability Engine V3.1
 # =========================================================
 def compute_regime_probabilities(metrics):
 
@@ -238,44 +255,76 @@ def compute_regime_probabilities(metrics):
         "🔴 市場壓力": 0
     }
 
-    # ---------------- 風險偏好 ----------------
-    if spx > 0:
+    # =====================================================
+    # 🟢 風險偏好 (Risk-On)
+    # =====================================================
+
+    if spx > 0.5:
         scores["🟢 風險偏好"] += 2
-    if vix < 0:
+
+    if vix < -1:
         scores["🟢 風險偏好"] += 2
-    if gold < 0:
+
+    if gold < -0.5:
         scores["🟢 風險偏好"] += 1
 
-    # ---------------- 通膨環境 ----------------
-    if oil > 0:
+    # =====================================================
+    # 🟠 通膨環境 (Inflation)
+    # =====================================================
+
+    if oil > 1:
         scores["🟠 通膨環境"] += 2
-    if y10 > 0:
+
+    if y10 > 1:
         scores["🟠 通膨環境"] += 2
-    if gold > 0:
+
+    if gold > 0.5:
         scores["🟠 通膨環境"] += 1
 
-    # ---------------- 經濟放緩 ----------------
-    if spx < 0:
+    # =====================================================
+    # 🟡 經濟放緩 (Slowdown)
+    # =====================================================
+
+    if spx < -0.5:
         scores["🟡 經濟放緩"] += 2
-    if oil < 0:
-        scores["🟡 經濟放緩"] += 1
-    if y10 < 0:
+
+    if oil < -1:
         scores["🟡 經濟放緩"] += 1
 
-    # ---------------- 市場壓力 ----------------
-    if vix > 0:
+    if y10 < -1:
+        scores["🟡 經濟放緩"] += 1
+
+    # =====================================================
+    # 🔴 市場壓力 (Stress)
+    # =====================================================
+
+    if vix > 2:
         scores["🔴 市場壓力"] += 2
-    if spx < 0 and vix > 0:
+
+    if spx < -0.5 and vix > 2:
         scores["🔴 市場壓力"] += 2
-    if gold > 0:
+
+    if gold > 0.5:
         scores["🔴 市場壓力"] += 1
+
+    # =====================================================
+    # Normalize
+    # =====================================================
 
     total = sum(scores.values())
 
     if total == 0:
-        return {k: 0 for k in scores}
+        return {
+            "🟢 風險偏好": 25,
+            "🟠 通膨環境": 25,
+            "🟡 經濟放緩": 25,
+            "🔴 市場壓力": 25
+        }
 
-    return {k: round(v / total * 100, 1) for k, v in scores.items()}
+    return {
+        k: round(v / total * 100, 1)
+        for k, v in scores.items()
+    }
 
 # =========================================================
 # 🧠 Regime Narrative Engine
@@ -480,7 +529,7 @@ for i, name in enumerate(metric_order):
 
     # 防止 NoneType crash
     val_str = f"{val:.2f}" if val is not None else "N/A"
-    delta_str = f"{delta:.2f}" if delta is not None else "0.00"
+    delta_str = f"{delta:.2f}%" if delta is not None else "0.00"
 
     with cols[i]:
         st.metric(
