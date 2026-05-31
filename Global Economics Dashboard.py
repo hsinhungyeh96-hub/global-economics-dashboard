@@ -423,15 +423,6 @@ st.subheader("🌍 全球市場狀態引擎")
 
 global_data = fetch_global_metrics()
 
-# =========================================================
-# 🧠 Market Regime
-# =========================================================
-regime, desc = classify_market_regime_v25(global_data)
-
-st.markdown("### 🧠 市場 Regime 判斷")
-st.info(f"**{regime}**\n\n{desc}")
-
-st.markdown("---")
 
 # =========================================================
 # 📊 KPI Metrics Display（安全版）
@@ -469,6 +460,16 @@ for i, name in enumerate(metric_order):
             value=val_str,
             delta=delta_str
         )
+
+st.markdown("---")
+
+# =========================================================
+# 🧠 Market Regime
+# =========================================================
+regime, desc = classify_market_regime_v25(global_data)
+
+st.markdown("### 🧠 市場 Regime 判斷")
+st.info(f"**{regime}**\n\n{desc}")
 
 st.markdown("---")
 
