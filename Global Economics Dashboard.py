@@ -556,7 +556,7 @@ df_prob = pd.DataFrame({
     "機率 (%)": list(probs.values())
 })
 
-st.markdown("### Regime 含義")
+st.caption("### -Regime 含義-")
 
 st.caption("🟢 風險偏好：股市上漲 + 波動下降 → 風險資產受青睞")
 st.caption("🟠 通膨環境：能源與利率上升 → 市場交易通膨預期")
