@@ -30,28 +30,29 @@ client = OpenAI(
 import json
 
 @st.cache_data(ttl=86400)
-def get_ai_summary(news_titles, date_str):
-    if not news_titles:
+def get_ai_summary(_news_titles, country_code, date_str):
+    if not _news_titles:
         return None
     
+    # 注意這裡的變數名稱要改成 _news_titles
     prompt = f"""
     今天是 {date_str}，請針對以下新聞進行財經總結。
     請務必使用【繁體中文】輸出。
-    請僅輸出純 JSON 字串，不要包含任何 ```json 或 ``` 標記。
+    請僅輸出純 JSON 字串，不要包含任何 ```json 或 ``` 標記，也不要包含任何文字解釋。
     {{
         "market_focus": "一句話總結市場焦點，30字內",
         "stock_outlook": "股市動向分析",
         "currency_outlook": "匯率變動方向",
         "risk_tip": "關鍵風險提示"
     }}
-    新聞標題：{', '.join(news_titles)}
+    新聞標題：{', '.join(_news_titles)}
     """
     
     try:
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是一位專業的財經分析師。請始終使用繁體中文進行分析。請只輸出 JSON。"},
+                {"role": "system", "content": "你是一位專業的財經分析師。請始終使用繁體中文進行分析。請只輸出 JSON，不要輸出任何 Markdown 格式或額外對話。"},
                 {"role": "user", "content": prompt}
             ],
             stream=False
@@ -60,17 +61,14 @@ def get_ai_summary(news_titles, date_str):
         content = response.choices[0].message.content.strip()
         content = content.replace("```json", "").replace("```", "").strip()
         
-        # 1. 先將結果存入變數，而不是直接 return
         data = json.loads(content)
         
-        # 2. 進行繁簡轉換處理
         for key, value in data.items():
             if isinstance(value, str):
                 data[key] = cc.convert(value)
             
-        return data # 3. 最後才回傳
+        return data
     except Exception as e:
-        # 建議這裡可以印出錯誤，除錯比較快
         print(f"AI Summary Error: {e}")
         return None
 # =========================================================
@@ -430,9 +428,11 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
             titles = [item['title'] for item in news_items]
             
             st.markdown("### 🤖 每日市場總結")
+            
+            # 修正縮排並呼叫新版快取函式（傳入 code）
             with st.spinner("AI 正在分析市場趨勢..."):
                 today = datetime.date.today().strftime("%Y-%m-%d")
-                summary = get_ai_summary(titles, today)
+                summary = get_ai_summary(titles, code, today)
             
             if summary:
                 with st.container(border=True):
