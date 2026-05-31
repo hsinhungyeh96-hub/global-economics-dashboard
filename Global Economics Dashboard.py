@@ -231,7 +231,17 @@ def get_ai_summary(country_code, date_str, lang):
 
     news_items = get_news(info["新聞"])
     if not news_items:
-        return None
+        return {
+
+        "market_focus": "No major news available.",
+
+        "stock_outlook": "Insufficient news data.",
+
+        "currency_outlook": "Insufficient news data.",
+
+        "risk_tip": "Monitor future developments."
+
+        }
 
     news_titles = [item["title"] for item in news_items[:5]]
 
