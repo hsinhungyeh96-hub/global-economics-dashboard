@@ -232,10 +232,10 @@ def compute_regime_probabilities(metrics):
     spx = metrics["標普500 (S&P500)"]["delta"]
 
     scores = {
-        "🟢 Risk-On": 0,
-        "🟠 Inflation": 0,
-        "🟡 Recession": 0,
-        "🔴 Stress": 0
+        "🟢 風險偏好": 0,
+        "🟠 通膨環境": 0,
+        "🟡 經濟放緩": 0,
+        "🔴 市場壓力": 0
     }
 
     # ---------------- Risk-On ----------------
@@ -276,6 +276,38 @@ def compute_regime_probabilities(metrics):
         return {k: 0 for k in scores}
 
     return {k: round(v / total * 100, 1) for k, v in scores.items()}
+
+# =========================================================
+# 🧠 Regime Narrative Engine
+# =========================================================
+def generate_regime_narrative(probs):
+
+    top_regime = max(probs, key=probs.get)
+
+    narratives = {
+
+        "🟢 Risk-On": (
+            "🟢 Risk-On",
+            "風險偏好回升，資金持續流向股票等風險資產。"
+        ),
+
+        "🟠 Inflation": (
+            "🟠 Inflation Regime",
+            "能源與利率同步上升，市場主要交易通膨預期。"
+        ),
+
+        "🟡 Recession": (
+            "🟡 Slowdown / Recession Risk",
+            "經濟成長放緩訊號增加，市場開始反映衰退風險。"
+        ),
+
+        "🔴 Stress": (
+            "🔴 Risk-Off / Stress",
+            "波動率上升且資金偏向避險資產，市場風險情緒升溫。"
+        )
+    }
+
+    return narratives[top_regime]
 # =========================================================
 # 📰 新聞 (保持原樣)
 # =========================================================
@@ -468,9 +500,15 @@ probs = compute_regime_probabilities(global_data)
 st.markdown("### 🧠 市場 Regime 判斷")
 
 # 找最大 regime
+regime, desc = generate_regime_narrative(probs)
+
 top_regime = max(probs, key=probs.get)
 
-st.success(f"**主導 Regime: {top_regime} ({probs[top_regime]}%)**")
+st.success(
+    f"**主導 Regime: {regime} ({probs[top_regime]}%)**"
+)
+
+st.info(desc)
 
 # =========================================================
 # 📊 Chart
@@ -493,7 +531,9 @@ fig = px.pie(
     df_prob,
     names="市場狀態",
     values="機率 (%)",
-    hole=0.4,  # 👉 變成 donut chart（更現代）
+    hole=0.45,
+    color="市場狀態",
+    color_discrete_map=color_map
 )
 
 fig.update_traces(
