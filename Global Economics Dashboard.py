@@ -410,7 +410,7 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
             
             # 使用手動觸核機制，避免一載入就瞬間向 DeepSeek 發出 20+ 次請求導致 API 崩潰
             button_key = f"btn_{code}"
-            if button_key hungry_not_in := (code not in st.session_state.ai_triggered):
+            if code not in st.session_state.ai_triggered:
                 st.session_state.ai_triggered[code] = False
                 
             if not st.session_state.ai_triggered[code]:
