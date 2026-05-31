@@ -556,6 +556,13 @@ df_prob = pd.DataFrame({
     "機率 (%)": list(probs.values())
 })
 
+color_map = {
+    "🟢 風險偏好": "#2ECC71",
+    "🟠 通膨環境": "#F39C12",
+    "🟡 經濟放緩": "#F1C40F",
+    "🔴 市場壓力": "#E74C3C"
+}
+
 st.markdown("### 🧠 Regime 含義")
 
 st.markdown("""
