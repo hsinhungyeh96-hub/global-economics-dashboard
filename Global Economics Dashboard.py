@@ -9,6 +9,9 @@ import yfinance as yf
 from openai import OpenAI
 import streamlit as st
 import json
+from opencc import OpenCC
+import json
+cc = OpenCC('s2t')
 
 # =========================================================
 # 🔐 API 安全設定
