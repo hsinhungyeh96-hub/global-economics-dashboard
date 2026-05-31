@@ -518,7 +518,7 @@ global_data = fetch_global_metrics()
 
 probs = compute_regime_probabilities(global_data)
 
-st.markdown("### 🧠 Market Regime Probabilities (V3)")
+st.markdown("### 🧠 市場 Regime 判斷")
 
 # 找最大 regime
 top_regime = max(probs, key=probs.get)
