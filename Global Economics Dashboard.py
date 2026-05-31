@@ -489,19 +489,19 @@ color_map = {
     "🔴 Stress": "#E74C3C"
 }
 
-fig_prob = px.bar(
+fig = px.pie(
     df_prob,
-    x="市場狀態",
-    y="機率 (%)",
-    text="機率 (%)",
-    color="市場狀態",
-    color_discrete_map=color_map
+    names="市場狀態",
+    values="機率 (%)",
+    hole=0.4,  # 👉 變成 donut chart（更現代）
 )
 
-fig_prob.update_layout(showlegend=False) # 隱藏圖例讓版面更簡潔
+fig.update_traces(
+    textinfo="percent+label",
+    hovertemplate="%{label}<br>%{value:.1f}%<extra></extra>"
+)
 
-# ⚠️ 修正：加上這一行，圖表才會真正顯示在 Streamlit 畫面上！
-st.plotly_chart(fig_prob, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True)
 
 # =========================================================
 # 📋 Data Table
