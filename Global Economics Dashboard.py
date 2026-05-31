@@ -1,5 +1,3 @@
-這是一份整合了** Z-Score 波動率標準化**、防分母為零機制、地圖留白優化，以及**「點擊才生成」的 AI 節流機制 (Lazy Loading)** 的完整優化版程式碼。
-你可以直接複製並覆蓋原有的程式碼：
 import streamlit as st
 import pandas as pd
 import datetime
