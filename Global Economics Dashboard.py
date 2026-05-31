@@ -62,6 +62,11 @@ def get_ai_summary(news_titles, date_str):
         # 清理可能產生的 Markdown 標記
         content = content.replace("```json", "").replace("```", "").strip()
         return json.loads(content)
+        for key, value in data.items():
+            if isinstance(value, str):
+                data[key] = cc.convert(value)
+            
+        return data
     except Exception as e:
         # 這裡可以 print(e) 來除錯，看看到底是哪裡解析錯誤
         return None
