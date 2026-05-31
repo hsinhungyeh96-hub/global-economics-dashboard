@@ -91,7 +91,7 @@ COUNTRY_CONFIG = {
     "FRA": {"名稱": "法國", "洲": "歐洲", "匯率": "EUR=X", "指數": "^FCHI", "新聞": "France economy"},
     "GBR": {"名稱": "英國", "洲": "歐洲", "匯率": "GBP=X", "指數": "^FTSE", "新聞": "United Kingdom economy"},
     "ITA": {"名稱": "義大利", "洲": "歐洲", "匯率": "EUR=X", "指數": "FTSEMIB.MI", "新聞": "Italy economy"},
-    "RUS": {"名稱": "俄羅斯(能源基準）", "洲": "歐洲", "匯率": "RUB=X", "指數": "BZ=F", "新聞": "Russia economy"},
+    "RUS": {"名稱": "俄羅斯", "洲": "歐洲", "匯率": "RUB=X", "指數": "BZ=F", "新聞": "Russia economy"},
 
     # 亞洲
     "CHN": {"名稱": "中國", "洲": "亞洲", "匯率": "CNY=X", "指數": "000001.SS", "新聞": "China economy"},
@@ -306,19 +306,23 @@ else:
     filtered_df = df
 
 # =========================================================
-# 📈 全球總經 KPI 板塊
+# 📈 全球總經 KPI 板塊 (修正版)
 # =========================================================
 st.subheader("🌍 全球核心市場指標")
 global_data = fetch_global_metrics()
 
-cols = st.columns(4)
-for col, (name, data) in zip(cols, global_data.items()):
-    col.metric(
-        label=name, 
-        value=f"{data['val']:.2f}", 
-        delta=f"{data['delta']:.2f}"
-    )
-st.markdown("---") # 分隔線
+if not global_data:
+    st.error("❌ 無法取得核心市場指標數據，請檢查 Yahoo Finance 連線。")
+else:
+    # 確保 columns 的數量與抓到的資料數量一致，或者固定數量
+    cols = st.columns(len(global_data))
+    for col, (name, data) in zip(cols, global_data.items()):
+        col.metric(
+            label=name, 
+            value=f"{data['val']:.2f}", 
+            delta=f"{data['delta']:.2f}"
+        )
+st.markdown("---")
 
 # =========================================================
 # 📋 Data Table
