@@ -188,7 +188,8 @@ def fetch_global_metrics():
         "恐慌指數 (VIX)": "^VIX",
         "黃金 (Gold)": "GC=F",
         "原油 (Crude Oil)": "CL=F",
-        "10年期美債殖利率": "^TNX"
+        "10年期美債殖利率": "^TNX",
+        "標普500 (S&P500)": "^GSPC"
     }
     
     results = {}
@@ -219,6 +220,66 @@ def fetch_global_metrics():
             
     return results
 
+# =========================================================
+# 🧠 Market Regime Engine V2.5
+# =========================================================
+def classify_market_regime_v25(metrics):
+
+    vix = metrics["恐慌指數 (VIX)"]
+    gold = metrics["黃金 (Gold)"]
+    oil = metrics["原油 (Crude Oil)"]
+    yield10 = metrics["10年期美債殖利率"]
+    spx = metrics["標普500 (S&P500)"]
+
+    vix_d = vix["delta"]
+    gold_d = gold["delta"]
+    oil_d = oil["delta"]
+    y_d = yield10["delta"]
+    spx_d = spx["delta"]
+
+    # ---------------------------
+    # 🔴 Crisis / Risk-Off
+    # ---------------------------
+    if vix_d > 0 and spx_d < 0:
+        return (
+            "🔴 Risk-Off / Stress",
+            "股市下跌 + 波動上升，資金轉向避險資產"
+        )
+
+    # ---------------------------
+    # 🟠 Inflation Regime
+    # ---------------------------
+    if oil_d > 0 and y_d > 0 and gold_d > 0:
+        return (
+            "🟠 Inflation Regime",
+            "能源與利率同步上升，市場交易通膨壓力"
+        )
+
+    # ---------------------------
+    # 🟡 Slowdown / Recession Risk
+    # ---------------------------
+    if spx_d < 0 and oil_d < 0 and y_d < 0:
+        return (
+            "🟡 Slowdown / Recession Risk",
+            "股市與商品下跌，利率回落，成長預期轉弱"
+        )
+
+    # ---------------------------
+    # 🟢 Risk-On
+    # ---------------------------
+    if spx_d > 0 and vix_d < 0:
+        return (
+            "🟢 Risk-On",
+            "風險偏好回升，股市主導資金流"
+        )
+
+    # ---------------------------
+    # ⚪ Mixed
+    # ---------------------------
+    return (
+        "⚪ Mixed Regime",
+        "市場訊號分歧，尚未形成一致敘事"
+    )
 # =========================================================
 # 📰 新聞 (保持原樣)
 # =========================================================
@@ -355,22 +416,60 @@ else:
     filtered_df = df
 
 # =========================================================
-# 📈 全球總經 KPI 板塊 (修改顯示邏輯)
+# 📈 全球總經 KPI 板塊 (V2.5 Regime Integrated)
 # =========================================================
-st.subheader("🌍 全球核心市場指標")
+
+st.subheader("🌍 全球市場狀態引擎")
+
 global_data = fetch_global_metrics()
 
-# 固定使用 4 欄，確保版面穩定
-cols = st.columns(4) 
+# =========================================================
+# 🧠 Market Regime
+# =========================================================
+regime, desc = classify_market_regime_v25(global_data)
 
-# 使用 enumerate 確保對應正確的欄位
-for i, (name, data) in enumerate(global_data.items()):
+st.markdown("### 🧠 市場 Regime 判斷")
+st.info(f"**{regime}**\n\n{desc}")
+
+st.markdown("---")
+
+# =========================================================
+# 📊 KPI Metrics Display（安全版）
+# =========================================================
+
+# 固定順序（避免 dict 順序變動造成 UI 跳動）
+metric_order = [
+    "恐慌指數 (VIX)",
+    "黃金 (Gold)",
+    "原油 (Crude Oil)",
+    "10年期美債殖利率",
+    "標普500 (S&P500)"
+]
+
+cols = st.columns(len(metric_order))
+
+for i, name in enumerate(metric_order):
+
+    # 防止 key error（避免 API/抓取失敗炸 UI）
+    if name not in global_data:
+        continue
+
+    data = global_data[name]
+
+    val = data.get("val", 0.0)
+    delta = data.get("delta", 0.0)
+
+    # 防止 NoneType crash
+    val_str = f"{val:.2f}" if val is not None else "N/A"
+    delta_str = f"{delta:.2f}" if delta is not None else "0.00"
+
     with cols[i]:
         st.metric(
-            label=name, 
-            value=f"{data['val']:.2f}", 
-            delta=f"{data['delta']:.2f}"
+            label=name,
+            value=val_str,
+            delta=delta_str
         )
+
 st.markdown("---")
 
 # =========================================================
