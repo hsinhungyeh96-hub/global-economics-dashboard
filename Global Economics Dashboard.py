@@ -302,7 +302,6 @@ def compute_regime_probabilities(metrics):
     "🔴 風險壓力（Stress）": 0
 
 }
-    }
 
     # ---------------- Risk-On ----------------
     if spx > 0: scores["🟢 Risk-On"] += 2
