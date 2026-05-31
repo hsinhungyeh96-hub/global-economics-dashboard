@@ -421,17 +421,24 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
                 today = datetime.date.today().strftime("%Y-%m-%d")
                 summary = get_ai_summary(titles, today)
             
-            if summary:
+           if summary:
                 with st.container(border=True):
                     st.write(f"📅 **分析日期：** {today}")
                     st.write(f"🎯 **市場焦點：** {summary['market_focus']}")
                     
-                    # 使用 Columns 讓排版更對稱、專業
-                    col1, col2 = st.columns(2)
-                    col1.write(f"📈 **股市動向：**\n{summary['stock_outlook']}")
-                    col2.write(f"💰 **匯率走勢：**\n{summary['currency_outlook']}")
+                    # 這裡使用更嚴謹的分欄排版
+                    col1, col2 = st.columns([1, 1])
                     
-                    st.write(f"⚠️ **風險提示：** {summary['risk_tip']}")
+                    with col1:
+                        st.markdown("**📈 股市動向：**")
+                        st.info(summary['stock_outlook']) # 使用 st.info 賦予獨立背景框
+                        
+                    with col2:
+                        st.markdown("**💰 匯率走勢：**")
+                        st.info(summary['currency_outlook']) # 使用 st.info 賦予獨立背景框
+                    
+                    st.markdown("**⚠️ 風險提示：**")
+                    st.warning(summary['risk_tip']) # 使用 st.warning 賦予獨立背景框
             else:
                 st.error("AI 分析暫時無法取得，請稍後再試。")
                 
