@@ -556,14 +556,12 @@ df_prob = pd.DataFrame({
     "機率 (%)": list(probs.values())
 })
 
-st.markdown("### -Regime 含義-")
+st.markdown("### Regime 含義")
 
-st.markdown("""
-- 🟢 **風險偏好**：股市上漲 + 波動下降 → 風險資產受青睞  
-- 🟠 **通膨環境**：能源與利率上升 → 市場交易通膨預期  
-- 🟡 **經濟放緩**：成長走弱 → 股票與商品承壓  
-- 🔴 **市場壓力**：VIX 上升 + 股市下跌 → 避險情緒升溫  
-""")
+st.caption("🟢 風險偏好：股市上漲 + 波動下降 → 風險資產受青睞")
+st.caption("🟠 通膨環境：能源與利率上升 → 市場交易通膨預期")
+st.caption("🟡 經濟放緩：成長走弱 → 股票與商品承壓")
+st.caption("🔴 市場壓力：VIX 上升 + 股市下跌 → 避險情緒升溫")
 
 fig = px.pie(
     df_prob,
