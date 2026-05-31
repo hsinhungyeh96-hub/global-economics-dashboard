@@ -223,6 +223,7 @@ def generate_regime_narrative(probs, lang):
 # =========================================================
 # 🧠 Dynamic AI Engine (Native Translation)
 # =========================================================
+@st.cache_data(ttl=86400)
 def get_ai_summary(country_code, date_str, lang):
     info = COUNTRY_CONFIG[country_code]
     news_items = get_news(info["新聞"])
