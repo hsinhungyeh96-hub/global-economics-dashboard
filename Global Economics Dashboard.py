@@ -549,6 +549,13 @@ color_map = {
     "🔴 Stress": "#E74C3C"
 }
 
+color_map = {
+    "🟢 Risk-On": "#2ECC71",
+    "🟠 Inflation": "#F39C12",
+    "🟡 Recession": "#F1C40F",
+    "🔴 Stress": "#E74C3C"
+}
+
 fig = px.bar(
     df_prob,
     x="市場狀態",
@@ -557,8 +564,6 @@ fig = px.bar(
     color="市場狀態",
     color_discrete_map=color_map
 )
-
-st.plotly_chart(fig, use_container_width=True)
 
 # =========================================================
 # 📋 Data Table
