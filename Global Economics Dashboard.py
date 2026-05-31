@@ -169,11 +169,11 @@ def fetch_live_market_data(ticker_symbol, currency_pair):
     return price, pct_change, ytd_change, fx_change
 
 # =========================================================
-# 🌎 全球核心總經指標抓取
+# 🌎 全球核心總經指標抓取 (最終穩定版)
 # =========================================================
 @st.cache_data(ttl=300)
 def fetch_global_metrics():
-    # 定義指標代碼與名稱
+    # 定義指標
     metrics = {
         "恐慌指數 (VIX)": "^VIX",
         "黃金 (Gold)": "GC=F",
@@ -183,11 +183,30 @@ def fetch_global_metrics():
     
     results = {}
     for name, ticker in metrics.items():
-        data = yf.Ticker(ticker).history(period="2d")
-        if len(data) >= 2:
-            latest = data['Close'].iloc[-1]
-            prev = data['Close'].iloc[-2]
-            results[name] = {"val": latest, "delta": latest - prev}
+        try:
+            # 抓取近 5 天數據 (即便假日也會顯示最後交易日)
+            data = yf.Ticker(ticker).history(period="5d")
+            
+            if not data.empty and len(data) >= 1:
+                # 取得最新一筆價格
+                latest = data['Close'].iloc[-1]
+                
+                # 若有歷史數據(>=2)，則計算漲跌；若只有 1 筆，delta 設為 0
+                if len(data) >= 2:
+                    prev = data['Close'].iloc[-2]
+                    delta = latest - prev
+                else:
+                    delta = 0.0
+                
+                results[name] = {"val": latest, "delta": delta}
+            else:
+                # 若完全沒資料，補上 0 避免區塊消失
+                results[name] = {"val": 0.0, "delta": 0.0}
+                
+        except Exception as e:
+            # 若發生錯誤，給予預設值，確保程式不中斷
+            results[name] = {"val": 0.0, "delta": 0.0}
+            
     return results
 
 # =========================================================
@@ -306,18 +325,18 @@ else:
     filtered_df = df
 
 # =========================================================
-# 📈 全球總經 KPI 板塊 (修正版)
+# 📈 全球總經 KPI 板塊 (修改顯示邏輯)
 # =========================================================
 st.subheader("🌍 全球核心市場指標")
 global_data = fetch_global_metrics()
 
-if not global_data:
-    st.error("❌ 無法取得核心市場指標數據，請檢查 Yahoo Finance 連線。")
-else:
-    # 確保 columns 的數量與抓到的資料數量一致，或者固定數量
-    cols = st.columns(len(global_data))
-    for col, (name, data) in zip(cols, global_data.items()):
-        col.metric(
+# 固定使用 4 欄，確保版面穩定
+cols = st.columns(4) 
+
+# 使用 enumerate 確保對應正確的欄位
+for i, (name, data) in enumerate(global_data.items()):
+    with cols[i]:
+        st.metric(
             label=name, 
             value=f"{data['val']:.2f}", 
             delta=f"{data['delta']:.2f}"
