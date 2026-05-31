@@ -482,13 +482,6 @@ st.plotly_chart(fig_map, use_container_width=True)
 # 📰 財經新聞與 AI 每日快取系統
 # =========================================================
 
-language = st.sidebar.selectbox(
-    "🌐 Language",
-    [
-        "繁體中文",
-        "English"
-    ]
-)
 
 TEXT = {
     "繁體中文": {
