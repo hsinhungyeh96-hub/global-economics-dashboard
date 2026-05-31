@@ -31,11 +31,11 @@ def get_ai_summary(news_titles, date_str):
     if not news_titles:
         return None
     
-    # 強制要求 JSON 格式，不帶 Markdown，避免 AI 隨意發揮排版
+    # 在 Prompt 中強制要求「繁體中文」與「嚴格 JSON」
     prompt = f"""
-    今天是 {date_str}，請針對以下新聞標題進行財經總結。
-    請嚴格以 JSON 格式輸出，不要包含任何標記語法。
-    格式請遵守：
+    今天是 {date_str}，請針對以下新聞進行財經總結。
+    請務必使用【繁體中文】輸出。
+    請僅輸出純 JSON 字串，不要包含任何 ```json 或 ``` 標記，也不要包含任何文字解釋。
     {{
         "market_focus": "一句話總結市場焦點，30字內",
         "stock_outlook": "股市動向分析",
@@ -49,15 +49,18 @@ def get_ai_summary(news_titles, date_str):
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是一位專業的財經分析師，只輸出符合格式的 JSON，不要有任何多餘解釋。"},
+                {"role": "system", "content": "你是一位專業的財經分析師。請始終使用繁體中文進行分析。請只輸出 JSON，不要輸出任何 Markdown 格式或額外對話。"},
                 {"role": "user", "content": prompt}
             ],
             stream=False
         )
-        # 解析 JSON
-        content = response.choices[0].message.content.replace("```json", "").replace("```", "").strip()
+        
+        content = response.choices[0].message.content.strip()
+        # 清理可能產生的 Markdown 標記
+        content = content.replace("```json", "").replace("```", "").strip()
         return json.loads(content)
-    except Exception:
+    except Exception as e:
+        # 這裡可以 print(e) 來除錯，看看到底是哪裡解析錯誤
         return None
 
 # =========================================================
