@@ -237,94 +237,82 @@ def fetch_global_metrics():
     return results
 
 
+import numpy as np
+
 # =========================================================
-# 🧠 Market Regime Probability Engine V3.1
+# 🧠 Market Regime Probability Engine V3 (Continuous Weights)
 # =========================================================
 def compute_regime_probabilities(metrics):
 
-    vix = metrics["恐慌指數 (VIX)"]["delta"]
-    gold = metrics["黃金 (Gold)"]["delta"]
-    oil = metrics["原油 (Crude Oil)"]["delta"]
-    y10 = metrics["10年期美債殖利率"]["delta"]
-    spx = metrics["標普500 (S&P500)"]["delta"]
+    def safe(x):
+        return 0 if x is None else x
 
+    vix = safe(metrics["恐慌指數 (VIX)"]["delta"])
+    gold = safe(metrics["黃金 (Gold)"]["delta"])
+    oil = safe(metrics["原油 (Crude Oil)"]["delta"])
+    y10 = safe(metrics["10年期美債殖利率"]["delta"])
+    spx = safe(metrics["標普500 (S&P500)"]["delta"])
+
+    # ---------------------------------------------------------
+    # 1. normalize function (soft scaling)
+    # ---------------------------------------------------------
+    def w(x):
+        # log-scaling prevents extreme spikes
+        return np.log1p(abs(x)) * np.sign(x)
+
+    vix_w = w(vix)
+    gold_w = w(gold)
+    oil_w = w(oil)
+    y10_w = w(y10)
+    spx_w = w(spx)
+
+    # ---------------------------------------------------------
+    # 2. regime scores (continuous contributions)
+    # ---------------------------------------------------------
     scores = {
-        "🟢 風險偏好": 0,
-        "🟠 通膨環境": 0,
-        "🟡 經濟放緩": 0,
-        "🔴 市場壓力": 0
+        "🟢 風險偏好": 0.0,
+        "🟠 通膨環境": 0.0,
+        "🟡 經濟放緩": 0.0,
+        "🔴 市場壓力": 0.0
     }
 
-    # =====================================================
-    # 🟢 風險偏好 (Risk-On)
-    # =====================================================
+    # =========================
+    # Risk-On
+    # =========================
+    scores["🟢 風險偏好"] += max(spx_w, 0)
+    scores["🟢 風險偏好"] += max(-vix_w, 0)
+    scores["🟢 風險偏好"] += max(-gold_w, 0) * 0.5
 
-    if spx > 0.5:
-        scores["🟢 風險偏好"] += 2
+    # =========================
+    # Inflation
+    # =========================
+    scores["🟠 通膨環境"] += max(oil_w, 0)
+    scores["🟠 通膨環境"] += max(y10_w, 0)
+    scores["🟠 通膨環境"] += max(gold_w, 0) * 0.5
 
-    if vix < -1:
-        scores["🟢 風險偏好"] += 2
+    # =========================
+    # Recession / Slowdown
+    # =========================
+    scores["🟡 經濟放緩"] += max(-spx_w, 0)
+    scores["🟡 經濟放緩"] += max(-oil_w, 0)
+    scores["🟡 經濟放緩"] += max(-y10_w, 0)
 
-    if gold < -0.5:
-        scores["🟢 風險偏好"] += 1
+    # =========================
+    # Stress / Risk-off
+    # =========================
+    scores["🔴 市場壓力"] += max(vix_w, 0)
+    scores["🔴 市場壓力"] += max(-spx_w, 0) * 0.5
+    scores["🔴 市場壓力"] += max(gold_w, 0) * 0.5
 
-    # =====================================================
-    # 🟠 通膨環境 (Inflation)
-    # =====================================================
-
-    if oil > 1:
-        scores["🟠 通膨環境"] += 2
-
-    if y10 > 1:
-        scores["🟠 通膨環境"] += 2
-
-    if gold > 0.5:
-        scores["🟠 通膨環境"] += 1
-
-    # =====================================================
-    # 🟡 經濟放緩 (Slowdown)
-    # =====================================================
-
-    if spx < -0.5:
-        scores["🟡 經濟放緩"] += 2
-
-    if oil < -1:
-        scores["🟡 經濟放緩"] += 1
-
-    if y10 < -1:
-        scores["🟡 經濟放緩"] += 1
-
-    # =====================================================
-    # 🔴 市場壓力 (Stress)
-    # =====================================================
-
-    if vix > 2:
-        scores["🔴 市場壓力"] += 2
-
-    if spx < -0.5 and vix > 2:
-        scores["🔴 市場壓力"] += 2
-
-    if gold > 0.5:
-        scores["🔴 市場壓力"] += 1
-
-    # =====================================================
-    # Normalize
-    # =====================================================
-
+    # ---------------------------------------------------------
+    # 3. normalize to probabilities
+    # ---------------------------------------------------------
     total = sum(scores.values())
 
     if total == 0:
-        return {
-            "🟢 風險偏好": 25,
-            "🟠 通膨環境": 25,
-            "🟡 經濟放緩": 25,
-            "🔴 市場壓力": 25
-        }
+        return {k: 0 for k in scores}
 
-    return {
-        k: round(v / total * 100, 1)
-        for k, v in scores.items()
-    }
+    return {k: round(v / total * 100, 1) for k, v in scores.items()}
 
 # =========================================================
 # 🧠 Regime Narrative Engine
