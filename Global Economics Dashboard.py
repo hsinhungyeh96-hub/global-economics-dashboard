@@ -292,15 +292,11 @@ def compute_regime_probabilities(metrics):
     y10 = metrics["10年期美債殖利率"]["delta"]
     spx = metrics["標普500 (S&P500)"]["delta"]
 
-    scores = {
-         "🟢 風險偏好（Risk-On）": 0,
-
-    "🟠 通膨環境（Inflation）": 0,
-
-    "🟡 經濟放緩（Recession）": 0,
-
-    "🔴 風險壓力（Stress）": 0
-
+ scores = {
+    "🟢 Risk-On": 0,
+    "🟠 Inflation": 0,
+    "🟡 Recession": 0,
+    "🔴 Stress": 0
 }
 
     # ---------------- Risk-On ----------------
@@ -515,10 +511,8 @@ for i, name in enumerate(metric_order):
 st.markdown("---")
 
 # =========================================================
-# 🧠 V3 Regime Probabilities
+# 🧠 V3 Regime Probabilities（FIXED）
 # =========================================================
-
-global_data = fetch_global_metrics()
 
 probs = compute_regime_probabilities(global_data)
 
