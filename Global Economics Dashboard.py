@@ -7,10 +7,10 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 from openai import OpenAI
-import streamlit as st
 import json
 from opencc import OpenCC
-import json
+
+# 初始化 OpenCC
 cc = OpenCC('s2t')
 
 # =========================================================
@@ -34,11 +34,10 @@ def get_ai_summary(news_titles, date_str):
     if not news_titles:
         return None
     
-    # 在 Prompt 中強制要求「繁體中文」與「嚴格 JSON」
     prompt = f"""
     今天是 {date_str}，請針對以下新聞進行財經總結。
     請務必使用【繁體中文】輸出。
-    請僅輸出純 JSON 字串，不要包含任何 ```json 或 ``` 標記，也不要包含任何文字解釋。
+    請僅輸出純 JSON 字串，不要包含任何 ```json 或 ``` 標記。
     {{
         "market_focus": "一句話總結市場焦點，30字內",
         "stock_outlook": "股市動向分析",
@@ -52,25 +51,28 @@ def get_ai_summary(news_titles, date_str):
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是一位專業的財經分析師。請始終使用繁體中文進行分析。請只輸出 JSON，不要輸出任何 Markdown 格式或額外對話。"},
+                {"role": "system", "content": "你是一位專業的財經分析師。請始終使用繁體中文進行分析。請只輸出 JSON。"},
                 {"role": "user", "content": prompt}
             ],
             stream=False
         )
         
         content = response.choices[0].message.content.strip()
-        # 清理可能產生的 Markdown 標記
         content = content.replace("```json", "").replace("```", "").strip()
-        return json.loads(content)
+        
+        # 1. 先將結果存入變數，而不是直接 return
+        data = json.loads(content)
+        
+        # 2. 進行繁簡轉換處理
         for key, value in data.items():
             if isinstance(value, str):
                 data[key] = cc.convert(value)
             
-        return data
+        return data # 3. 最後才回傳
     except Exception as e:
-        # 這裡可以 print(e) 來除錯，看看到底是哪裡解析錯誤
+        # 建議這裡可以印出錯誤，除錯比較快
+        print(f"AI Summary Error: {e}")
         return None
-
 # =========================================================
 # 🌍 基礎設定
 # =========================================================
