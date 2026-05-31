@@ -585,10 +585,6 @@ fig.update_traces(
     hovertemplate="%{label}<br>%{value:.1f}%<extra></extra>"
 )
 
-# 🚫 關掉 legend（重點）
-fig.update_layout(
-    showlegend=False
-)
 
 # =========================================================
 # 📋 Data Table
