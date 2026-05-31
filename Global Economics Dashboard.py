@@ -389,17 +389,28 @@ fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
 st.plotly_chart(fig_map, use_container_width=True)
 
 # =========================================================
-# 📰 財經新聞與 AI 節流加載系統 (Lazy Loading)
+# 📰 財經新聞與 AI 節流加載系統 (優化版：支持一鍵批量更新)
 # =========================================================
+st.sidebar.markdown("---")
+st.sidebar.subheader("🤖 AI 自動化控制")
+if st.sidebar.button("🚀 更新當前洲別所有 AI 報告"):
+    # 遍歷目前篩選結果，將所有國家設為已觸發
+    for code in filtered_df["國家代碼"]:
+        st.session_state.ai_triggered[code] = True
+    st.rerun()
+
 st.header("📰 全球即時財經新聞")
-tab_names = [info["名稱"] for info in COUNTRY_CONFIG.values()]
+
+# 初始化 Session State
+if "ai_triggered" not in st.session_state:
+    st.session_state.ai_triggered = {code: False for code in COUNTRY_CONFIG}
+
+# 根據篩選器過濾出要顯示的國家
+display_countries = {k: v for k, v in COUNTRY_CONFIG.items() if continent_filter == "全部" or v["洲"] == continent_filter}
+tab_names = [info["名稱"] for info in display_countries.values()]
 tabs = st.tabs(tab_names)
 
-# 初始化用來紀錄各國 AI 報告生成狀態的 Session State
-if "ai_triggered" not in st.session_state:
-    st.session_state.ai_triggered = {}
-
-for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
+for tab, (code, info) in zip(tabs, display_countries.items()):
     with tab:
         news_items = get_news(info["新聞"])
         if not news_items:
@@ -408,17 +419,9 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
             titles = [item['title'] for item in news_items]
             st.markdown("### 🤖 每日市場總結")
             
-            # 使用手動觸核機制，避免一載入就瞬間向 DeepSeek 發出 20+ 次請求導致 API 崩潰
-            button_key = f"btn_{code}"
-            if code not in st.session_state.ai_triggered:
-                st.session_state.ai_triggered[code] = False
-                
-            if not st.session_state.ai_triggered[code]:
-                if st.button("🧠 點擊生成該國 AI 深度趨勢報告", key=button_key):
-                    st.session_state.ai_triggered[code] = True
-                    st.rerun()
-            else:
-                with st.spinner("AI 正在分析市場趨勢..."):
+            # 狀態檢查：如果是觸發狀態，直接顯示 AI 分析
+            if st.session_state.ai_triggered.get(code, False):
+                with st.spinner(f"AI 正在分析 {info['名稱']} 市場趨勢..."):
                     today = datetime.date.today().strftime("%Y-%m-%d")
                     summary = get_ai_summary(titles, code, today)
                 
@@ -436,7 +439,12 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
                         st.markdown("**⚠️ 風險提示：**")
                         st.warning(summary['risk_tip'])
                 else:
-                    st.error("AI 分析暫時無法取得，請稍後再試。")
+                    st.error("AI 分析暫時無法取得。")
+            else:
+                # 尚未觸發時顯示按鈕
+                if st.button(f"🧠 生成 {info['名稱']} 的 AI 深度趨勢報告", key=f"btn_{code}"):
+                    st.session_state.ai_triggered[code] = True
+                    st.rerun()
                 
             st.divider()
             st.markdown("### 📰 最新頭條")
