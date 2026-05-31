@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 from openai import OpenAI
 import streamlit as st
+import json
 
 # =========================================================
 # 🔐 API 安全設定
@@ -23,30 +24,24 @@ client = OpenAI(
     api_key=api_key, 
     base_url="https://api.deepseek.com"
 )
+import json
+
 @st.cache_data(ttl=86400)
 def get_ai_summary(news_titles, date_str):
     if not news_titles:
-        return "⚠️ 目前無相關新聞，無法進行分析。"
+        return None
     
- # 強制規定輸出格式
+    # 強制要求 JSON 格式，不帶 Markdown，避免 AI 隨意發揮排版
     prompt = f"""
     今天是 {date_str}，請針對以下新聞標題進行財經總結。
-    請嚴格遵守以下格式輸出，不要使用任何 Markdown 的標題語法 (如 #, ##, ###)，改用粗體 **文字** 來表示標題：
-
-    ---
-    **日期：{date_str}**
-    
-    ### 🎯 市場焦點
-    (一句話精準總結今日主要趨勢，限 30 字內)
-
-    ### 📈 潛在影響預測
-    * **股市動向**：(分析對大盤指數的影響)
-    * **貨幣走勢**：(分析匯率可能的變動方向)
-
-    ### ⚠️ 風險提示
-    (簡述最關鍵的一個風險點)
-    ---
-
+    請嚴格以 JSON 格式輸出，不要包含任何標記語法。
+    格式請遵守：
+    {{
+        "market_focus": "一句話總結市場焦點，30字內",
+        "stock_outlook": "股市動向分析",
+        "currency_outlook": "匯率變動方向",
+        "risk_tip": "關鍵風險提示"
+    }}
     新聞標題：{', '.join(news_titles)}
     """
     
@@ -54,14 +49,16 @@ def get_ai_summary(news_titles, date_str):
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是一位專業的財經分析師，請務必按照使用者要求的格式輸出，使用繁體中文。"},
+                {"role": "system", "content": "你是一位專業的財經分析師，只輸出符合格式的 JSON，不要有任何多餘解釋。"},
                 {"role": "user", "content": prompt}
             ],
             stream=False
         )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"AI 分析服務暫時無法取得。"
+        # 解析 JSON
+        content = response.choices[0].message.content.replace("```json", "").replace("```", "").strip()
+        return json.loads(content)
+    except Exception:
+        return None
 
 # =========================================================
 # 🌍 基礎設定
@@ -416,25 +413,33 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
         if not news_items:
             st.warning("目前無新聞")
         else:
-            # 將所有東西都包在一個主要的 container 內，確保排版一致
-            with st.container():
-                titles = [item['title'] for item in news_items]
-                
-                # AI 分析區塊
+            # --- 固定排版：UI 由我們完全控制 ---
+            titles = [item['title'] for item in news_items]
+            
+            st.markdown("### 🤖 每日市場總結")
+            with st.spinner("AI 正在分析市場趨勢..."):
+                today = datetime.date.today().strftime("%Y-%m-%d")
+                summary = get_ai_summary(titles, today)
+            
+            if summary:
                 with st.container(border=True):
-                    st.markdown("### 🤖 每日市場總結")
-                    with st.spinner("AI 正在整理報告..."):
-                        today = datetime.date.today().strftime("%Y-%m-%d")
-                        summary = get_ai_summary(titles, today)
-                        st.markdown(summary)
+                    st.write(f"📅 **分析日期：** {today}")
+                    st.write(f"🎯 **市場焦點：** {summary['market_focus']}")
+                    
+                    # 使用 Columns 讓排版更對稱、專業
+                    col1, col2 = st.columns(2)
+                    col1.write(f"📈 **股市動向：**\n{summary['stock_outlook']}")
+                    col2.write(f"💰 **匯率走勢：**\n{summary['currency_outlook']}")
+                    
+                    st.write(f"⚠️ **風險提示：** {summary['risk_tip']}")
+            else:
+                st.error("AI 分析暫時無法取得，請稍後再試。")
                 
-                # 確保橫線永遠跟隨在 AI 總結之後
-                st.divider() 
-                
-                # 新聞列表
-                st.markdown("### 📰 最新頭條")
-                for item in news_items:
-                    st.markdown(f"**[{item['title']}]({item['link']})** \n ⏱️ {item['date']}")
+            st.divider() # 這裡的橫線現在會穩穩地固定在新聞列表上方
+            
+            st.markdown("### 📰 最新頭條")
+            for item in news_items:
+                st.markdown(f"**[{item['title']}]({item['link']})** \n ⏱️ {item['date']}")
 # =========================================================
 # 📌 Footer
 # =========================================================
