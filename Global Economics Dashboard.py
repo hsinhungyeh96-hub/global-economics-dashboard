@@ -245,10 +245,24 @@ def get_news(keyword):
     return [] # 真的都抓不到才回傳空
 
 # =========================================================
-# 🌎 單國資料組裝
+# 🌎 單國資料組裝 (更新版)
 # =========================================================
 def fetch_country_data(code, info):
     price, pct_change, ytd_change, fx_change = fetch_live_market_data(info["指數"], info["匯率"])
+    
+    # --- 新增：計算年化波動率 ---
+    volatility = None
+    try:
+        # 抓取近一個月數據計算標準差
+        ticker = yf.Ticker(info["指數"])
+        hist = ticker.history(period="1mo")
+        if len(hist) > 1:
+            # 計算每日報酬率的標準差 -> 年化 (乘以 sqrt(252)) -> 轉為百分比
+            daily_returns = hist['Close'].pct_change()
+            volatility = daily_returns.std() * (252**0.5) * 100
+    except:
+        pass
+    # ---------------------------
 
     return {
         "國家代碼": code,
@@ -258,7 +272,8 @@ def fetch_country_data(code, info):
         "指數點位": round(price, 2) if price else None,
         "單日指數漲跌幅 (%)": round(pct_change, 2) if pct_change else None,
         "年初指數至今報酬 (%)": round(ytd_change, 2) if ytd_change else None,
-        "單日匯率漲跌幅 (%)": round(fx_change, 2) if fx_change is not None else None # 修改這裡
+        "單日匯率漲跌幅 (%)": round(fx_change, 2) if fx_change is not None else None,
+        "市場波動率 (%)": round(volatility, 2) if volatility is not None else 0.0 # 新增欄位
     }
 
 # =========================================================
@@ -279,7 +294,8 @@ def build_dataset():
     numeric_cols = [
         "指數點位", 
         "單日指數漲跌幅 (%)", 
-        "年初指數至今報酬 (%)", 
+        "年初指數至今報酬 (%)",
+        "市場波動率 (%)",
         "單日匯率漲跌幅 (%)"  # 這裡要確認是否已改名
     ]
     
@@ -313,7 +329,7 @@ continent_filter = st.sidebar.selectbox(
 # sidebar 選項要與字典中的 Key 嚴格對應
 metric = st.sidebar.selectbox(
     "選擇地圖指標",
-    ["單日指數漲跌幅 (%)", "年初指數至今報酬 (%)", "單日匯率漲跌幅 (%)"]
+    ["單日指數漲跌幅 (%)", "年初指數至今報酬 (%)", "單日匯率漲跌幅 (%)", "市場波動率 (%)"]
 )
 
 # =========================================================
