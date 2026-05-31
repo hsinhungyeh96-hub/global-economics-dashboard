@@ -421,28 +421,28 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
                 today = datetime.date.today().strftime("%Y-%m-%d")
                 summary = get_ai_summary(titles, today)
             
-           if summary:
+            if summary:
                 with st.container(border=True):
                     st.write(f"📅 **分析日期：** {today}")
                     st.write(f"🎯 **市場焦點：** {summary['market_focus']}")
                     
-                    # 這裡使用更嚴謹的分欄排版
+                    # 使用 Columns 讓排版更對稱
                     col1, col2 = st.columns([1, 1])
                     
                     with col1:
                         st.markdown("**📈 股市動向：**")
-                        st.info(summary['stock_outlook']) # 使用 st.info 賦予獨立背景框
+                        st.info(summary['stock_outlook']) 
                         
                     with col2:
                         st.markdown("**💰 匯率走勢：**")
-                        st.info(summary['currency_outlook']) # 使用 st.info 賦予獨立背景框
+                        st.info(summary['currency_outlook'])
                     
                     st.markdown("**⚠️ 風險提示：**")
-                    st.warning(summary['risk_tip']) # 使用 st.warning 賦予獨立背景框
+                    st.warning(summary['risk_tip'])
             else:
                 st.error("AI 分析暫時無法取得，請稍後再試。")
                 
-            st.divider() # 這裡的橫線現在會穩穩地固定在新聞列表上方
+            st.divider() # 橫線固定在新聞列表上方
             
             st.markdown("### 📰 最新頭條")
             for item in news_items:
