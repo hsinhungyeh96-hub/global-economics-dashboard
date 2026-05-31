@@ -280,6 +280,53 @@ def classify_market_regime_v25(metrics):
         "⚪ Mixed Regime",
         "市場訊號分歧，尚未形成一致敘事"
     )
+
+# =========================================================
+# 🧠 Market Regime Probability Engine V3
+# =========================================================
+def compute_regime_probabilities(metrics):
+
+    vix = metrics["恐慌指數 (VIX)"]["delta"]
+    gold = metrics["黃金 (Gold)"]["delta"]
+    oil = metrics["原油 (Crude Oil)"]["delta"]
+    y10 = metrics["10年期美債殖利率"]["delta"]
+    spx = metrics["標普500 (S&P500)"]["delta"]
+
+    scores = {
+        "🟢 Risk-On": 0,
+        "🟠 Inflation": 0,
+        "🟡 Recession": 0,
+        "🔴 Stress": 0
+    }
+
+    # ---------------- Risk-On ----------------
+    if spx > 0: scores["🟢 Risk-On"] += 2
+    if vix < 0: scores["🟢 Risk-On"] += 2
+    if gold < 0: scores["🟢 Risk-On"] += 1
+
+    # ---------------- Inflation ----------------
+    if oil > 0: scores["🟠 Inflation"] += 2
+    if y10 > 0: scores["🟠 Inflation"] += 2
+    if gold > 0: scores["🟠 Inflation"] += 1
+
+    # ---------------- Recession ----------------
+    if spx < 0: scores["🟡 Recession"] += 2
+    if oil < 0: scores["🟡 Recession"] += 1
+    if y10 < 0: scores["🟡 Recession"] += 1
+
+    # ---------------- Stress / Risk-Off ----------------
+    if vix > 0: scores["🔴 Stress"] += 2
+    if spx < 0 and vix > 0: scores["🔴 Stress"] += 2
+    if gold > 0: scores["🔴 Stress"] += 1
+
+    # normalize → probability
+    total = sum(scores.values())
+    if total == 0:
+        return {k: 0 for k in scores}
+
+    probs = {k: round(v / total * 100, 1) for k, v in scores.items()}
+
+    return probs
 # =========================================================
 # 📰 新聞 (保持原樣)
 # =========================================================
@@ -464,14 +511,42 @@ for i, name in enumerate(metric_order):
 st.markdown("---")
 
 # =========================================================
-# 🧠 Market Regime
+# 🧠 V3 Regime Probabilities
 # =========================================================
-regime, desc = classify_market_regime_v25(global_data)
 
-st.markdown("### 🧠 市場 Regime 判斷")
-st.info(f"**{regime}**\n\n{desc}")
+global_data = fetch_global_metrics()
 
-st.markdown("---")
+probs = compute_regime_probabilities(global_data)
+
+st.markdown("### 🧠 Market Regime Probabilities (V3)")
+
+# 找最大 regime
+top_regime = max(probs, key=probs.get)
+
+st.success(f"**Dominant Regime: {top_regime} ({probs[top_regime]}%)**")
+
+# =========================================================
+# 📊 Chart
+# =========================================================
+
+df_prob = pd.DataFrame({
+    "Regime": list(probs.keys()),
+    "Probability": list(probs.values())
+})
+
+fig = px.bar(
+    df_prob,
+    x="Regime",
+    y="Probability",
+    text="Probability"
+)
+
+fig.update_layout(
+    yaxis_title="Probability (%)",
+    xaxis_title="Market Regime"
+)
+
+st.plotly_chart(fig, use_container_width=True)
 
 # =========================================================
 # 📋 Data Table
