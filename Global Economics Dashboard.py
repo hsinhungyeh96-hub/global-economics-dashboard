@@ -293,10 +293,15 @@ def compute_regime_probabilities(metrics):
     spx = metrics["標普500 (S&P500)"]["delta"]
 
     scores = {
-        "🟢 Risk-On": 0,
-        "🟠 Inflation": 0,
-        "🟡 Recession": 0,
-        "🔴 Stress": 0
+         "🟢 風險偏好（Risk-On）": 0,
+
+    "🟠 通膨環境（Inflation）": 0,
+
+    "🟡 經濟放緩（Recession）": 0,
+
+    "🔴 風險壓力（Stress）": 0
+
+}
     }
 
     # ---------------- Risk-On ----------------
@@ -523,27 +528,22 @@ st.markdown("### 🧠 市場 Regime 判斷")
 # 找最大 regime
 top_regime = max(probs, key=probs.get)
 
-st.success(f"**Dominant Regime: {top_regime} ({probs[top_regime]}%)**")
+st.success(f"**主導 Regime: {top_regime} ({probs[top_regime]}%)**")
 
 # =========================================================
 # 📊 Chart
 # =========================================================
 
 df_prob = pd.DataFrame({
-    "Regime": list(probs.keys()),
-    "Probability": list(probs.values())
+    "市場狀態": list(probs.keys()),
+    "機率 (%)": list(probs.values())
 })
 
 fig = px.bar(
     df_prob,
-    x="Regime",
-    y="Probability",
-    text="Probability"
-)
-
-fig.update_layout(
-    yaxis_title="Probability (%)",
-    xaxis_title="Market Regime"
+    x="市場狀態",
+    y="機率 (%)",
+    text="機率 (%)"
 )
 
 st.plotly_chart(fig, use_container_width=True)
