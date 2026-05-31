@@ -238,37 +238,37 @@ def compute_regime_probabilities(metrics):
         "🔴 市場壓力": 0
     }
 
-    # ---------------- Risk-On ----------------
+    # ---------------- 風險偏好 ----------------
     if spx > 0:
-        scores["🟢 Risk-On"] += 2
+        scores["🟢 風險偏好"] += 2
     if vix < 0:
-        scores["🟢 Risk-On"] += 2
+        scores["🟢 風險偏好"] += 2
     if gold < 0:
-        scores["🟢 Risk-On"] += 1
+        scores["🟢 風險偏好"] += 1
 
-    # ---------------- Inflation ----------------
+    # ---------------- 通膨環境 ----------------
     if oil > 0:
-        scores["🟠 Inflation"] += 2
+        scores["🟠 通膨環境"] += 2
     if y10 > 0:
-        scores["🟠 Inflation"] += 2
+        scores["🟠 通膨環境"] += 2
     if gold > 0:
-        scores["🟠 Inflation"] += 1
+        scores["🟠 通膨環境"] += 1
 
-    # ---------------- Recession ----------------
+    # ---------------- 經濟放緩 ----------------
     if spx < 0:
-        scores["🟡 Recession"] += 2
+        scores["🟡 經濟放緩"] += 2
     if oil < 0:
-        scores["🟡 Recession"] += 1
+        scores["🟡 經濟放緩"] += 1
     if y10 < 0:
-        scores["🟡 Recession"] += 1
+        scores["🟡 經濟放緩"] += 1
 
-    # ---------------- Stress ----------------
+    # ---------------- 市場壓力 ----------------
     if vix > 0:
-        scores["🔴 Stress"] += 2
+        scores["🔴 市場壓力"] += 2
     if spx < 0 and vix > 0:
-        scores["🔴 Stress"] += 2
+        scores["🔴 市場壓力"] += 2
     if gold > 0:
-        scores["🔴 Stress"] += 1
+        scores["🔴 市場壓力"] += 1
 
     total = sum(scores.values())
 
@@ -286,23 +286,23 @@ def generate_regime_narrative(probs):
 
     narratives = {
 
-        "🟢 Risk-On": (
-            "🟢 Risk-On",
+        "🟢 風險偏好": (
+            "🟢 風險偏好",
             "風險偏好回升，資金持續流向股票等風險資產。"
         ),
 
-        "🟠 Inflation": (
-            "🟠 Inflation Regime",
+        "🟠 通膨環境": (
+            "🟠 通膨環境 Regime",
             "能源與利率同步上升，市場主要交易通膨預期。"
         ),
 
-        "🟡 Recession": (
-            "🟡 Slowdown / Recession Risk",
+        "🟡 經濟放緩": (
+            "🟡 Slowdown / 經濟放緩 Risk",
             "經濟成長放緩訊號增加，市場開始反映衰退風險。"
         ),
 
-        "🔴 Stress": (
-            "🔴 Risk-Off / Stress",
+        "🔴 市場壓力": (
+            "🔴 Risk-Off / 市場壓力",
             "波動率上升且資金偏向避險資產，市場風險情緒升溫。"
         )
     }
@@ -521,10 +521,10 @@ df_prob = pd.DataFrame({
 
 # 刪除重複的 color_map，只保留一個
 color_map = {
-    "🟢 Risk-On": "#2ECC71",
-    "🟠 Inflation": "#F39C12",
-    "🟡 Recession": "#F1C40F",
-    "🔴 Stress": "#E74C3C"
+    "🟢 風險偏好": "#2ECC71",
+    "🟠 通膨環境": "#F39C12",
+    "🟡 經濟放緩": "#F1C40F",
+    "🔴 市場壓力": "#E74C3C"
 }
 
 fig = px.pie(
