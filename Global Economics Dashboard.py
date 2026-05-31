@@ -416,19 +416,25 @@ for tab, (code, info) in zip(tabs, COUNTRY_CONFIG.items()):
         if not news_items:
             st.warning("目前無新聞")
         else:
-            # --- AI 分析區塊 ---
-            titles = [item['title'] for item in news_items]
-            
-            with st.container(border=True): # 這裡修正了縮排，與 titles 對齊
-                st.markdown("### 🤖 每日市場總結")
-                with st.spinner("AI 正在整理報告..."):
-                    today = datetime.date.today().strftime("%Y-%m-%d")
-                    summary = get_ai_summary(titles, today)
-                    st.markdown(summary)
-            
-            st.divider() 
-            for item in news_items:
-                st.markdown(f"### [{item['title']}]({item['link']}) \n ⏱️ {item['date']}")
+            # 將所有東西都包在一個主要的 container 內，確保排版一致
+            with st.container():
+                titles = [item['title'] for item in news_items]
+                
+                # AI 分析區塊
+                with st.container(border=True):
+                    st.markdown("### 🤖 每日市場總結")
+                    with st.spinner("AI 正在整理報告..."):
+                        today = datetime.date.today().strftime("%Y-%m-%d")
+                        summary = get_ai_summary(titles, today)
+                        st.markdown(summary)
+                
+                # 確保橫線永遠跟隨在 AI 總結之後
+                st.divider() 
+                
+                # 新聞列表
+                st.markdown("### 📰 最新頭條")
+                for item in news_items:
+                    st.markdown(f"**[{item['title']}]({item['link']})** \n ⏱️ {item['date']}")
 # =========================================================
 # 📌 Footer
 # =========================================================
