@@ -8,6 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 from openai import OpenAI
 import json
+import re
+import traceback
 from opencc import OpenCC
 import numpy as np
 from deep_translator import GoogleTranslator
@@ -226,42 +228,124 @@ def generate_regime_narrative(probs, lang):
 @st.cache_data(ttl=86400)
 def get_ai_summary(country_code, date_str, lang):
     info = COUNTRY_CONFIG[country_code]
+
     news_items = get_news(info["新聞"])
-    if not news_items: return None
+    if not news_items:
+        return None
 
     news_titles = [item["title"] for item in news_items[:5]]
-    lang_instruction = "請務必使用繁體中文。" if lang == "繁體中文" else "Please output entirely in English."
-    
+
+    lang_instruction = (
+        "請務必使用繁體中文。"
+        if lang == "繁體中文"
+        else "Please output entirely in English."
+    )
+
     prompt = f"""
-Today is {date_str}. Based on the following headlines, analyze today's market condition.
+Today is {date_str}.
+
+Based on the following headlines, analyze today's market condition.
+
 {lang_instruction}
-Output ONLY JSON:
+
+Return a valid JSON object only.
+
+Do not use markdown.
+Do not use ```json.
+Do not provide explanations.
+Do not provide notes.
+Do not provide text before or after the JSON.
+
+Required format:
+
 {{
     "market_focus":"One sentence market focus",
     "stock_outlook":"Stock market analysis",
     "currency_outlook":"Currency trend analysis",
     "risk_tip":"Risk warning"
 }}
+
 Headlines:
 {chr(10).join(news_titles)}
 """
+
     try:
         response = client.chat.completions.create(
             model="deepseek-chat",
-            messages=[{"role": "system", "content": "You are a professional analyst. Output JSON only."}, 
-                      {"role": "user", "content": prompt}],
-            stream=False
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a professional macro analyst. "
+                        "You must return a valid JSON object only."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            stream=False,
         )
-        content = response.choices[0].message.content.strip().replace("```json", "").replace("```", "").strip()
-        data = json.loads(content)
-        
-        # Apply OpenCC only if language is Chinese
+
+        content = response.choices[0].message.content.strip()
+
+        # =====================================================
+        # Extract JSON from response
+        # =====================================================
+        match = re.search(r"\{.*\}", content, re.DOTALL)
+
+        if not match:
+            raise ValueError(
+                f"No JSON found in model response.\n\nResponse:\n{content}"
+            )
+
+        json_text = match.group()
+
+        # =====================================================
+        # Parse JSON
+        # =====================================================
+        data = json.loads(json_text)
+
+        # =====================================================
+        # Validate required fields
+        # =====================================================
+        required_keys = {
+            "market_focus",
+            "stock_outlook",
+            "currency_outlook",
+            "risk_tip",
+        }
+
+        missing_keys = required_keys - set(data.keys())
+
+        if missing_keys:
+            raise ValueError(
+                f"Missing required keys: {missing_keys}\n\nJSON:\n{json_text}"
+            )
+
+        # =====================================================
+        # Convert Simplified Chinese -> Traditional Chinese
+        # =====================================================
         if lang == "繁體中文":
             for k, v in data.items():
-                if isinstance(v, str): data[k] = cc.convert(v)
+                if isinstance(v, str):
+                    data[k] = cc.convert(v)
+
         return data
+
     except Exception as e:
-        print(f"AI Summary Error: {e}")
+
+        print("=" * 80)
+        print("AI SUMMARY ERROR")
+        print("=" * 80)
+        print(f"Country: {country_code}")
+        print(f"Date: {date_str}")
+        print(f"Language: {lang}")
+        print()
+        print(traceback.format_exc())
+        print("=" * 80)
+
         return None
 
 # =========================================================
