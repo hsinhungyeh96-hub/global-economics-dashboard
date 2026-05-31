@@ -5,3 +5,4 @@ plotly
 yfinance
 openai
 opencc-python-reimplemented
+deep-translator
