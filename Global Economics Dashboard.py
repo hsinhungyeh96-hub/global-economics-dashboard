@@ -556,7 +556,6 @@ df_prob = pd.DataFrame({
     "機率 (%)": list(probs.values())
 })
 
-
 st.markdown("### -Regime 含義-")
 
 st.markdown("""
@@ -585,6 +584,8 @@ fig.update_traces(
     hovertemplate="%{label}<br>%{value:.1f}%<extra></extra>"
 )
 
+# ✅ 這行才是關鍵（你漏掉了）
+st.plotly_chart(fig, use_container_width=True)
 
 # =========================================================
 # 📋 Data Table
