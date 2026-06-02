@@ -119,7 +119,7 @@ COUNTRY_CONFIG = {
     "GRC": {"名稱": "希臘", "洲": "歐洲", "匯率": "EUR=X", "指數": "GREK", "新聞": "Greece economy", "en_name": "Greece"},
     "RUS": {"名稱": "俄羅斯", "洲": "歐洲", "匯率": "RUB=X", "指數": "BZ=F", "新聞": "Russia economy", "en_name": "Russia"},
 
-    "CHN": {"名稱": "中國", "洲": "亞洲", "匯率": "CNY=X", "指數": "510300.SS", "新聞": "China economy", "en_name": "China"},
+    "CHN": {"名稱": "中國", "洲": "亞洲", "匯率": "CNY=X", "指數": "MCHI", "新聞": "China economy", "en_name": "China"},
     "JPN": {"名稱": "日本", "洲": "亞洲", "匯率": "JPY=X", "指數": "^N225", "新聞": "Japan economy", "en_name": "Japan"},
     "KOR": {"名稱": "韓國", "洲": "亞洲", "匯率": "KRW=X", "指數": "069500.KS", "新聞": "South Korea economy", "en_name": "South Korea"},
     "IND": {"名稱": "印度", "洲": "亞洲", "匯率": "INR=X", "指數": "^BSESN", "新聞": "India economy", "en_name": "India"},
