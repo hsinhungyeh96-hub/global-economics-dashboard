@@ -672,38 +672,50 @@ if not re_chart_df.empty:
     fig_re.update_xaxes(tickformat="%Y-%m-%d")
     st.plotly_chart(fig_re, use_container_width=True)
 
-def render_yield_spread(vnq_ticker="VNQ", treasury_ticker="^TNX"):
-    st.markdown("### 🔍 房地產風險溢價分析 (Real Estate Risk Premium)")
+def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
+    # 設定標題語系
+    if current_lang == "English":
+        title = "🔍 Real Estate Risk Premium"
+        label1, label2, label3 = "REITs Yield (VNQ)", "Risk-Free Rate (10Y)", "Risk Premium (Spread)"
+        msg_err = "⚠️ Warning: REITs yield is lower than the risk-free rate! This often signals overvaluation or extreme bond market sell-off."
+        msg_warn = "⚖️ Observation: Risk premium is tightening. REITs attractiveness is waning; proceed with caution."
+        msg_succ = "✅ Healthy: Real Estate still offers a reasonable risk premium. Attractive for allocation."
+    else:
+        title = "🔍 房地產風險溢價分析"
+        label1, label2, label3 = "房地產收益率 (VNQ)", "無風險利率 (10Y)", "風險溢價 (Spread)"
+        msg_err = "⚠️ 警示：房地產殖利率低於無風險利率！這通常代表房地產資產估值過高或債市出現極端拋售。"
+        msg_warn = "⚖️ 觀察：風險溢價收窄。房地產的吸引力正在減弱，建議謹慎配置。"
+        msg_succ = "✅ 健康：房地產仍具備合理的風險溢價，資金配置具備吸引力。"
+
+    st.markdown(f"### {title}")
     
+    # 計算邏輯 (保持不變)
     vnq = yf.Ticker(vnq_ticker)
     tnx = yf.Ticker(treasury_ticker)
-    
-    # 取得數據
     info = vnq.info
-    # 修正：確保取得的是 decimal (例如 0.04)，若大於 1，則除以 100
     raw_yield = info.get('dividendYield', 0.04) 
     if raw_yield > 1: raw_yield = raw_yield / 100 
     
     vnq_yield = raw_yield * 100
     tnx_yield = tnx.history(period="1d")['Close'].iloc[-1]
-    
     spread = vnq_yield - tnx_yield
-    # 2. 顯示卡片
-    col1, col2, col3 = st.columns(3)
-    col1.metric("房地產收益率 (VNQ)", f"{vnq_yield:.2f}%")
-    col2.metric("無風險利率 (10Y)", f"{tnx_yield:.2f}%")
-    col3.metric("風險溢價 (Spread)", f"{spread:.2f}%", delta_color="inverse")
     
-    # 3. 評論邏輯
+    # 顯示指標
+    col1, col2, col3 = st.columns(3)
+    col1.metric(label1, f"{vnq_yield:.2f}%")
+    col2.metric(label2, f"{tnx_yield:.2f}%")
+    col3.metric(label3, f"{spread:.2f}%")
+    
+    # 顯示評論
     if spread < 0:
-        st.error("⚠️ 警示：房地產殖利率低於無風險利率！這通常代表房地產資產估值過高或債市出現極端拋售。")
+        st.error(msg_err)
     elif spread < 1.0:
-        st.warning("⚖️ 觀察：風險溢價收窄。房地產的吸引力正在減弱，建議謹慎配置。")
+        st.warning(msg_warn)
     else:
-        st.success("✅ 健康：房地產仍具備合理的風險溢價，資金配置具備吸引力。")
+        st.success(msg_succ)
 
-# 呼叫此函數
-render_yield_spread()
+# 最後在主程式區塊呼叫 (記得帶入語系參數)
+render_yield_spread(language)
 
 # =========================================================
 # 📰 房地產各大洲專屬 AI 新聞總結
