@@ -482,6 +482,26 @@ def render_market_heatmap(current_lang):
             data.append({"Asset": display_name, "Return": pct_change})
             
     df = pd.DataFrame(data)
+
+def get_market_commentary(data, lang):
+    # 計算房產相關指標的平均漲跌幅
+    re_assets = [val for key, val in data.items() if "房產" in key or "RE" in key]
+    avg_re = sum(re_assets) / len(re_assets) if re_assets else 0
+    
+    if lang == "English":
+        if avg_re > 2: return "🚀 Strong momentum: Real estate market is in a growth phase."
+        elif avg_re < -2: return "⚠️ Caution: Significant pullback in the global real estate sector."
+        else: return "⚖️ Stability: Real estate market shows sideways consolidation."
+    else:
+        if avg_re > 2: return "🚀 市場強勁：房地產市場正處於成長階段。"
+        elif avg_re < -2: return "⚠️ 警示：全球房地產板塊出現明顯回調。"
+        else: return "⚖️ 市場平穩：房地產板塊目前呈現盤整狀態。"
+
+# 在渲染完指標後，直接加入評論區塊
+st.divider()
+st.markdown("### 💡 市場深度評論")
+commentary = get_market_commentary(data, language)
+st.info(commentary)
     
     # 標題與標籤翻譯
     title_text = "Global Market Momentum (30-Day)" if current_lang == "English" else "全球市場動能總覽 (近30日)"
