@@ -462,21 +462,31 @@ def get_market_data(asset_dict):
     return pd.DataFrame(data)
 
 def render_market_heatmap():
-    df = get_market_data(ASSET_CONFIG)
+    data = []
+    for name, ticker in ASSET_CONFIG.items():
+        hist = yf.Ticker(ticker).history(period="60d")
+        if len(hist) >= 30:
+            price_now = hist['Close'].iloc[-1]
+            price_30d = hist['Close'].iloc[-30]
+            pct_change = ((price_now - price_30d) / price_30d) * 100
+            data.append({"Asset": name, "Return": pct_change})
+            
+    df = pd.DataFrame(data)
+    
     if not df.empty:
-        fig = px.treemap(
-            df, 
-            path=['資產類別'], 
-            values=[1]*len(df), # 確保每個方塊大小一致
-            color='漲跌幅', 
-            color_continuous_scale='RdYlGn', # 紅-黃-綠配色
-            range_color=[-5, 5], # 設定 +/- 5% 為熱力區間
-            title="全球市場動能熱力地圖 (近30日)"
+        # 使用方形熱力圖，看起來會像專業看板
+        fig = px.imshow(
+            [df['Return'].values], 
+            labels=dict(x="資產", y="", color="漲跌幅 (%)"),
+            x=df['Asset'].values,
+            y=["近30日動能"],
+            color_continuous_scale='RdYlGn',
+            aspect="auto"
         )
-        fig.update_layout(margin=dict(t=50, l=0, r=0, b=0))
+        # 優化排版
+        fig.update_xaxes(side="top") # 把標籤放上面
+        fig.update_layout(height=200, coloraxis_showscale=True)
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("目前無法載入市場數據")
 
 def get_news(keyword):
     keywords_to_try = [keyword] + (["Taiwan stock market", "Taiex"] if keyword == "Taiwan economy" else 
