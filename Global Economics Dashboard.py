@@ -492,7 +492,9 @@ def render_market_heatmap(current_lang):
             labels=dict(x="Asset/Market", y="", color="Return %"),
             x=df['Asset'].values,
             y=[" "],
-            color_continuous_scale='RdYlGn',
+            # 這裡設定紅-黃-綠，且設定 0 為中間點
+            color_continuous_scale='RdYlGn', 
+            color_continuous_midpoint=0, 
             aspect="auto"
         )
         fig.update_layout(title=title_text, height=250)
