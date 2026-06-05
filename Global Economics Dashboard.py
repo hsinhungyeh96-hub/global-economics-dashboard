@@ -44,7 +44,11 @@ TEXT = {
         "latest_news": "📰 最新頭條",
         "no_news": "目前無新聞",
         "ai_error": "AI 分析暫時無法取得",
-        "analyzing": "AI 分析中..."
+        "analyzing": "AI 分析中...",
+        "re_header": "🏢 房地產宏觀市場總覽",
+        "re_metrics": "📊 關鍵房地產指標",
+        "re_chart": "📈 全球房地產與基準利率走勢",
+        "re_news": "📰 房地產市場焦點新聞"
     },
     "English": {
         "title": "🌐 Global Macro Dashboard Pro",
@@ -72,7 +76,11 @@ TEXT = {
         "latest_news": "📰 Latest Headlines",
         "no_news": "No news available",
         "ai_error": "AI Summary unavailable",
-        "analyzing": "AI is analyzing..."
+        "analyzing": "AI is analyzing...",
+        "re_header": "🏢 Real Estate Macro Market",
+        "re_metrics": "📊 Key Real Estate Metrics",
+        "re_chart": "📈 Global Real Estate vs Interest Rates",
+        "re_news": "📰 Real Estate Market Focus"
     }
 }
 
@@ -105,6 +113,16 @@ except Exception:
     st.stop() 
 
 client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+
+# --- 新增房地產標的設定 ---
+# 涵蓋美國REITs、全球REITs、美國房屋建商、以及對標的10年期美債
+REAL_ESTATE_CONFIG = {
+    "美國房地產 (VNQ)": "VNQ",
+    "全球不含美房市 (VNQI)": "VNQI",
+    "美國房屋建商 (ITB)": "ITB",
+    "商業不動產抵押 (REM)": "REM",
+    "10年期美債殖利率": "^TNX" 
+}
 
 COUNTRY_CONFIG = {
     "USA": {"名稱": "美國", "洲": "北美", "匯率": "USD=X", "指數": "^GSPC", "新聞": "United States economy", "en_name": "USA"},
@@ -366,6 +384,39 @@ Headlines:
 
         return None
 
+@st.cache_data(ttl=3600)
+def fetch_real_estate_data():
+    hist_data = {}
+    metrics_data = {}
+    
+    for name, ticker in REAL_ESTATE_CONFIG.items():
+        try:
+            stock = yf.Ticker(ticker)
+            # 抓取過去一年的數據作圖表
+            hist = stock.history(period="1y")
+            if not hist.empty:
+                # 正規化數據 (基準化為100)，方便將不同價格的ETF放在同一個圖表比較
+                hist_data[name] = (hist['Close'] / hist['Close'].iloc[0]) * 100
+                
+                # 計算單日與年初至今報酬
+                latest_price = hist['Close'].iloc[-1]
+                prev_price = hist['Close'].iloc[-2]
+                daily_pct = ((latest_price / prev_price) - 1) * 100
+                
+                metrics_data[name] = {
+                    "price": latest_price,
+                    "daily_pct": daily_pct
+                }
+        except Exception:
+            pass
+            
+    # 合併為 DataFrame 供 Plotly 使用
+    if hist_data:
+        df_chart = pd.DataFrame(hist_data).reset_index()
+        return df_chart, metrics_data
+    return pd.DataFrame(), {}
+
+
 # =========================================================
 # 📰 News & Dataset Builder
 # =========================================================
@@ -528,6 +579,131 @@ fig_map = px.choropleth(
 fig_map.update_geos(fitbounds="locations", visible=False)
 fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
 st.plotly_chart(fig_map, use_container_width=True)
+
+# =========================================================
+# 🏢 房地產宏觀市場模塊 (Real Estate Module)
+# =========================================================
+st.markdown("---")
+st.header(T["re_header"])
+
+re_chart_df, re_metrics = fetch_real_estate_data()
+
+if re_metrics:
+    st.subheader(T["re_metrics"])
+    # 動態產生 Metric Columns
+    re_cols = st.columns(len(REAL_ESTATE_CONFIG))
+    
+    # 對應英文名稱 (若選擇英文介面)
+    re_name_map_en = {
+        "美國房地產 (VNQ)": "US Real Estate (VNQ)",
+        "全球不含美房市 (VNQI)": "Global ex-US RE (VNQI)",
+        "美國房屋建商 (ITB)": "US Homebuilders (ITB)",
+        "商業不動產抵押 (REM)": "Mortgage REITs (REM)",
+        "10年期美債殖利率": "10Y Treasury Yield"
+    }
+
+    for i, (zh_name, data) in enumerate(re_metrics.items()):
+        display_name = re_name_map_en.get(zh_name, zh_name) if language == "English" else zh_name
+        with re_cols[i]:
+            val_str = f"{data['price']:.2f}"
+            delta_str = f"{data['daily_pct']:.2f}%"
+            # 10年期美債的單位是%，顯示上稍作區分
+            if "TNX" in REAL_ESTATE_CONFIG[zh_name]:
+                val_str = f"{data['price']:.3f}%"
+                delta_str = f"{data['daily_pct']:.2f} bps" # 近似基點變動
+                
+            st.metric(label=display_name, value=val_str, delta=delta_str)
+
+if not re_chart_df.empty:
+    st.subheader(T["re_chart"])
+    # 融化 DataFrame 以適應 Plotly 格式
+    df_melted = re_chart_df.melt(id_vars=["Date"], var_name="Asset", value_name="Normalized Performance (Base=100)")
+    
+    # 若為英文介面則替換圖例名稱
+    if language == "English":
+        df_melted["Asset"] = df_melted["Asset"].map(lambda x: re_name_map_en.get(x, x))
+        
+    fig_re = px.line(
+        df_melted, x="Date", y="Normalized Performance (Base=100)", color="Asset",
+        hover_data={"Date": "|%Y-%m-%d"}
+    )
+    fig_re.update_layout(
+        hovermode="x unified",
+        legend_title_text="資產標的" if language == "繁體中文" else "Assets",
+        margin={"r": 0, "t": 20, "l": 0, "b": 0}, 
+        height=400
+    )
+    st.plotly_chart(fig_re, use_container_width=True)
+
+# 房地產專屬 AI 新聞總結
+st.subheader(T["re_news"])
+re_news_keyword = "Global real estate market housing economy"
+re_news_items = get_news(re_news_keyword)
+
+if re_news_items:
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    with st.spinner(T["analyzing"]):
+        # 借用你寫好的 get_ai_summary 結構，但我們餵給他一個假的國家代碼來觸發
+        # 這裡為了不更動你原本的函數，我們直接在外部構建 prompt 並調用 AI (或你可以修改 get_ai_summary 讓它更通用)
+        
+        re_news_titles = [item["title"] for item in re_news_items[:5]]
+        lang_instruction = "請務必使用繁體中文。" if language == "繁體中文" else "Please output entirely in English."
+        re_prompt = f"""
+        Today is {today}.
+        Based on the following global real estate headlines, analyze the macro real estate market condition.
+        {lang_instruction}
+        Return a valid JSON object only. Do not use markdown.
+        Required format:
+        {{
+            "market_focus":"One sentence real estate market focus",
+            "stock_outlook":"REITs and housing market analysis",
+            "currency_outlook":"Impact of interest rates/yields on real estate",
+            "risk_tip":"Real estate risk warning"
+        }}
+        Headlines:
+        {chr(10).join(re_news_titles)}
+        """
+        
+        try:
+            re_response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": "You are a professional real estate macro analyst. Return valid JSON only."},
+                    {"role": "user", "content": re_prompt},
+                ],
+                stream=False,
+            )
+            re_content = re_response.choices[0].message.content.strip()
+            match = re.search(r"\{.*\}", re_content, re.DOTALL)
+            if match:
+                re_data = json.loads(match.group())
+                if language == "繁體中文":
+                    for k, v in re_data.items():
+                        if isinstance(v, str):
+                            re_data[k] = cc.convert(v)
+                
+                with st.container(border=True):
+                    st.write(f"📅 {today}")
+                    st.write(f"{T['focus']}：{re_data.get('market_focus', '')}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown(f"**🏢 房市與 REITs 展望**")
+                        st.info(re_data.get("stock_outlook", ""))
+                    with col2:
+                        st.markdown(f"**📉 利率環境與影響**")
+                        st.info(re_data.get("currency_outlook", ""))
+                    st.markdown(f"**{T['risk']}**")
+                    st.warning(re_data.get("risk_tip", ""))
+        except Exception as e:
+            st.error(T["ai_error"])
+            
+    # 顯示原始新聞連結
+    with st.expander("閱讀最新房地產新聞" if language == "繁體中文" else "Read Latest Real Estate News"):
+        for item in re_news_items:
+            title_text = translate_text(item['title'], "zh-TW") if language == "繁體中文" else item['title']
+            st.markdown(f"- **[{title_text}]({item['link']})** ({item['date']})")
+else:
+    st.warning(T["no_news"])
 
 # =========================================================
 # 📰 Financial News & AI Cache System
