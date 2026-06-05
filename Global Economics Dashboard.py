@@ -434,16 +434,40 @@ def fetch_real_estate_data():
 def get_news(keyword):
     keywords_to_try = [keyword] + (["Taiwan stock market", "Taiex"] if keyword == "Taiwan economy" else 
                                    ["China stock market", "Shanghai composite"] if keyword == "China economy" else [])
+    
     for kw in keywords_to_try:
         try:
-            url = f"https://news.google.com/rss/search?q={kw}&hl=en-US&gl=US&ceid=US:en"
-            response = session.get(url, timeout=10)
+            # 📌 防錯重點：不要自己把變數塞進字串，改用 params 讓 requests 自動做 URL 安全編碼
+            url = "https://news.google.com/rss/search"
+            payload = {
+                "q": kw,
+                "hl": "en-US",
+                "gl": "US",
+                "ceid": "US:en"
+            }
+            
+            response = session.get(url, params=payload, timeout=10)
+            
+            # 只有當 HTTP 狀態碼為 200 (成功) 時才解析
             if response.status_code == 200:
                 root = ET.fromstring(response.content)
                 items = root.findall(".//item")
                 if items:
-                    return [{"title": i.find("title").text, "link": i.find("link").text, "date": i.find("pubDate").text[:16]} for i in items[:5]]
-        except: continue
+                    return [
+                        {
+                            "title": i.find("title").text, 
+                            "link": i.find("link").text, 
+                            "date": i.find("pubDate").text[:16]
+                        } for i in items[:5]
+                    ]
+            else:
+                # 若 Google 暫時阻擋或回傳 500，印出警告但不讓程式崩潰
+                print(f"Google News RSS 請求失敗: {response.status_code} for keyword: {kw}")
+                
+        except Exception as e:
+            print(f"解析新聞發生錯誤: {e}")
+            continue
+            
     return []
 
 def fetch_country_data(code, info):
