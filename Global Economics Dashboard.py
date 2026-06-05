@@ -753,15 +753,27 @@ for tab, (zh_continent, keyword) in zip(re_tabs, RE_CONTINENT_KEYWORDS.items()):
                                 re_data[k] = cc.convert(v)
                     
                     with st.container(border=True):
+                        # 📌 修正：根據使用者選擇的語言，動態決定小標題的文字
+                        if language == "English":
+                            focus_label = "Focus: "
+                            col1_header = f"**🏢 {continent_name} Real Estate & REITs Outlook**"
+                            col2_header = "**📉 Interest Rate Environment & Impact**"
+                        else:
+                            focus_label = f"{T['focus']}："
+                            col1_header = f"**🏢 {continent_name}房市與 REITs 展望**"
+                            col2_header = "**📉 利率環境與影響**"
+
                         st.write(f"📅 {today_str}")
-                        st.write(f"{T['focus']}：{re_data.get('market_focus', '')}")
+                        st.write(f"**{focus_label}**{re_data.get('market_focus', '')}")
+                        
                         col1, col2 = st.columns(2)
                         with col1:
-                            st.markdown(f"**🏢 {continent_name}房市與 REITs 展望**")
+                            st.markdown(col1_header)
                             st.info(re_data.get("stock_outlook", ""))
                         with col2:
-                            st.markdown(f"**📉 利率環境與影響**")
+                            st.markdown(col2_header)
                             st.info(re_data.get("currency_outlook", ""))
+                            
                         st.markdown(f"**{T['risk']}**")
                         st.warning(re_data.get("risk_tip", ""))
                 else:
