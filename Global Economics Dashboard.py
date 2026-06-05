@@ -455,18 +455,48 @@ def fetch_real_estate_data():
 # 📰 News & Dataset Builder
 # =========================================================
 @st.cache_data(ttl=1800)
+
 def get_market_data(asset_dict):
-    data = []
+
+    rows = []
+
     for name, ticker in asset_dict.items():
-        # 抓取近 2 個月資料以計算 30 天變化
-        hist = yf.Ticker(ticker).history(period="2mo")
-        if len(hist) >= 30:
-            # 計算 30 天報酬率
-            price_now = hist['Close'].iloc[-1]
-            price_30d = hist['Close'].iloc[-30]
-            pct_change = ((price_now - price_30d) / price_30d) * 100
-            data.append({"資產類別": name, "漲跌幅": pct_change})
-    return pd.DataFrame(data)
+
+        try:
+
+            hist = yf.Ticker(ticker).history(period="2mo")
+
+            if len(hist) >= 30:
+
+                price_now = hist["Close"].iloc[-1]
+
+                price_30d = hist["Close"].iloc[-30]
+
+                pct_change = (
+
+                    (price_now - price_30d)
+
+                    / price_30d
+
+                ) * 100
+
+                rows.append(
+
+                    {
+
+                        "Asset": name,
+
+                        "Return": round(pct_change, 2)
+
+                    }
+
+                )
+
+        except Exception:
+
+            continue
+
+    return pd.DataFrame(rows)
 
 def render_market_heatmap(current_lang):
     data = []
@@ -500,19 +530,139 @@ def render_market_heatmap(current_lang):
         fig.update_layout(title=title_text, height=250)
         st.plotly_chart(fig, use_container_width=True)
 
-def get_market_commentary(data, lang):
-    # 計算房產相關指標的平均漲跌幅
-    re_assets = [val for key, val in data.items() if "房產" in key or "RE" in key]
-    avg_re = sum(re_assets) / len(re_assets) if re_assets else 0
-    
+def get_market_commentary(df, lang):
+
+    if df.empty:
+
+        return (
+
+            "No market data available."
+
+            if lang == "English"
+
+            else "目前無法取得市場資料。"
+
+        )
+
+    # 房地產相關資產
+
+    re_keywords = [
+
+        "房產",
+
+        "RE",
+
+        "VNQ",
+
+        "VNQI",
+
+        "ITB",
+
+        "REM"
+
+    ]
+
+    re_df = df[
+
+        df["Asset"].apply(
+
+            lambda x: any(
+
+                keyword in str(x)
+
+                for keyword in re_keywords
+
+            )
+
+        )
+
+    ]
+
+    avg_re = (
+
+        re_df["Return"].mean()
+
+        if not re_df.empty
+
+        else 0
+
+    )
+
+    # 整體市場平均
+
+    avg_market = df["Return"].mean()
+
+    # 最強資產
+
+    best_asset = df.loc[df["Return"].idxmax()]
+
+    worst_asset = df.loc[df["Return"].idxmin()]
+
     if lang == "English":
-        if avg_re > 2: return "🚀 Strong momentum: Real estate market is in a growth phase."
-        elif avg_re < -2: return "⚠️ Caution: Significant pullback in the global real estate sector."
-        else: return "⚖️ Stability: Real estate market shows sideways consolidation."
+
+        if avg_market > 3:
+
+            market_regime = "Risk-On"
+
+        elif avg_market < -3:
+
+            market_regime = "Risk-Off"
+
+        else:
+
+            market_regime = "Neutral"
+
+        return (
+
+            f"🌍 Market Regime: {market_regime}\n\n"
+
+            f"Average asset performance over the last 30 days is "
+
+            f"{avg_market:.1f}%. "
+
+            f"The strongest asset is {best_asset['Asset']} "
+
+            f"({best_asset['Return']:.1f}%), while the weakest is "
+
+            f"{worst_asset['Asset']} ({worst_asset['Return']:.1f}%). "
+
+            f"Real estate related assets averaged "
+
+            f"{avg_re:.1f}% during the same period."
+
+        )
+
     else:
-        if avg_re > 2: return "🚀 市場強勁：房地產市場正處於成長階段。"
-        elif avg_re < -2: return "⚠️ 警示：全球房地產板塊出現明顯回調。"
-        else: return "⚖️ 市場平穩：房地產板塊目前呈現盤整狀態。"
+
+        if avg_market > 3:
+
+            market_regime = "風險偏好（Risk-On）"
+
+        elif avg_market < -3:
+
+            market_regime = "避險模式（Risk-Off）"
+
+        else:
+
+            market_regime = "中性盤整"
+
+        return (
+
+            f"🌍 市場狀態：{market_regime}\n\n"
+
+            f"近30日主要資產平均報酬率為 {avg_market:.1f}%。"
+
+            f"表現最佳的資產為 {best_asset['Asset']} "
+
+            f"（{best_asset['Return']:.1f}%），"
+
+            f"表現最弱的資產為 {worst_asset['Asset']} "
+
+            f"（{worst_asset['Return']:.1f}%）。"
+
+            f"房地產相關資產平均報酬率為 {avg_re:.1f}%。"
+
+        )
 
 # 在渲染完指標後，直接加入評論區塊
 st.divider()
@@ -709,6 +859,33 @@ market_overview_title = "📊 Global Market Momentum" if language == "English" e
 st.subheader(market_overview_title)
 # 這裡會根據你側邊欄選擇的語系自動切換全套內容
 render_market_heatmap(language)
+# =========================================================
+
+# 💡 Market Commentary
+
+# =========================================================
+
+market_df = get_market_data(ASSET_CONFIG)
+
+st.divider()
+
+if language == "English":
+
+    st.markdown("### 💡 Market Commentary")
+
+else:
+
+    st.markdown("### 💡 市場深度評論")
+
+commentary = get_market_commentary(
+
+    market_df,
+
+    language
+
+)
+
+st.info(commentary)
 
 # =========================================================
 # 🏢 房地產宏觀市場模塊 (Real Estate Module)
