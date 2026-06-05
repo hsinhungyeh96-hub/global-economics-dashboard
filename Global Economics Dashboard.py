@@ -675,20 +675,19 @@ if not re_chart_df.empty:
 def render_yield_spread(vnq_ticker="VNQ", treasury_ticker="^TNX"):
     st.markdown("### 🔍 房地產風險溢價分析 (Real Estate Risk Premium)")
     
-    # 1. 取得數據
     vnq = yf.Ticker(vnq_ticker)
     tnx = yf.Ticker(treasury_ticker)
     
-    # 取得最新價格與相關資訊
-    vnq_info = vnq.info
-    tnx_hist = tnx.history(period="1d")
+    # 取得數據
+    info = vnq.info
+    # 修正：確保取得的是 decimal (例如 0.04)，若大於 1，則除以 100
+    raw_yield = info.get('dividendYield', 0.04) 
+    if raw_yield > 1: raw_yield = raw_yield / 100 
     
-    # 計算利差 (這裡使用 TTM Dividend Yield)
-    vnq_yield = vnq_info.get('dividendYield', 0.035) * 100 # 預設 3.5%
-    tnx_yield = tnx_hist['Close'].iloc[-1] # 10年期債券殖利率
+    vnq_yield = raw_yield * 100
+    tnx_yield = tnx.history(period="1d")['Close'].iloc[-1]
     
     spread = vnq_yield - tnx_yield
-    
     # 2. 顯示卡片
     col1, col2, col3 = st.columns(3)
     col1.metric("房地產收益率 (VNQ)", f"{vnq_yield:.2f}%")
