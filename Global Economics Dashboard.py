@@ -482,6 +482,23 @@ def render_market_heatmap(current_lang):
             data.append({"Asset": display_name, "Return": pct_change})
             
     df = pd.DataFrame(data)
+    
+    # 標題與標籤翻譯
+    title_text = "Global Market Momentum (30-Day)" if current_lang == "English" else "全球市場動能總覽 (近30日)"
+    
+    if not df.empty:
+        fig = px.imshow(
+            [df['Return'].values], 
+            labels=dict(x="Asset/Market", y="", color="Return %"),
+            x=df['Asset'].values,
+            y=[" "],
+            # 這裡設定紅-黃-綠，且設定 0 為中間點
+            color_continuous_scale='RdYlGn', 
+            color_continuous_midpoint=0, 
+            aspect="auto"
+        )
+        fig.update_layout(title=title_text, height=250)
+        st.plotly_chart(fig, use_container_width=True)
 
 def get_market_commentary(data, lang):
     # 計算房產相關指標的平均漲跌幅
@@ -502,23 +519,6 @@ st.divider()
 st.markdown("### 💡 市場深度評論")
 commentary = get_market_commentary(data, language)
 st.info(commentary)
-    
-    # 標題與標籤翻譯
-    title_text = "Global Market Momentum (30-Day)" if current_lang == "English" else "全球市場動能總覽 (近30日)"
-    
-    if not df.empty:
-        fig = px.imshow(
-            [df['Return'].values], 
-            labels=dict(x="Asset/Market", y="", color="Return %"),
-            x=df['Asset'].values,
-            y=[" "],
-            # 這裡設定紅-黃-綠，且設定 0 為中間點
-            color_continuous_scale='RdYlGn', 
-            color_continuous_midpoint=0, 
-            aspect="auto"
-        )
-        fig.update_layout(title=title_text, height=250)
-        st.plotly_chart(fig, use_container_width=True)
 
 
 def get_news(keyword):
