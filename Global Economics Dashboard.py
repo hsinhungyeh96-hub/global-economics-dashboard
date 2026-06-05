@@ -461,39 +461,31 @@ def get_market_data(asset_dict):
             data.append({"資產類別": name, "漲跌幅": pct_change})
     return pd.DataFrame(data)
 
-def render_market_metrics():
-    # 1. 取得數據並計算漲跌幅
-    data = {}
+def render_market_heatmap():
+    data = []
     for name, ticker in ASSET_CONFIG.items():
+        # 抓取最近 60 天資料
         hist = yf.Ticker(ticker).history(period="60d")
         if len(hist) >= 30:
             price_now = hist['Close'].iloc[-1]
             price_30d = hist['Close'].iloc[-30]
             pct_change = ((price_now - price_30d) / price_30d) * 100
-            data[name] = pct_change
+            data.append({"資產類別": name, "漲跌幅": pct_change})
+            
+    df = pd.DataFrame(data)
     
-    # 2. 分組排版 (根據資產類別)
-    # 這裡我們手動分組，讓版面更整齊
-    groups = {
-        "股市": ["🇺🇸 美股(SPY)", "🇯🇵 日股(^N225)"],
-        "房產": ["🌍 全球房產(REET)", "🏠 美國房產(VNQ)"],
-        "債券/利率": ["⚖️ 美國短債(SHV)"]
-    }
-    
-    for group_name, assets in groups.items():
-        st.markdown(f"#### {group_name}")
-        cols = st.columns(len(assets))
-        for col, asset_name in zip(cols, assets):
-            if asset_name in data:
-                val = data[asset_name]
-                # 簡化名稱，去掉 Emoji 方便顯示
-                display_name = asset_name.split(" ")[-1] 
-                col.metric(
-                    label=display_name, 
-                    value=f"{val:.2f}%", 
-                    delta=f"{val:.2f}%" if val != 0 else None
-                )
-        st.divider() # 畫一條線區隔
+    if not df.empty:
+        fig = px.treemap(
+            df, 
+            path=['資產類別'], 
+            values=[1]*len(df), 
+            color='漲跌幅', 
+            color_continuous_scale='RdYlGn', 
+            range_color=[-5, 5]
+        )
+        fig.update_layout(margin=dict(t=30, l=0, r=0, b=0))
+        st.plotly_chart(fig, use_container_width=True)
+
 
 def get_news(keyword):
     keywords_to_try = [keyword] + (["Taiwan stock market", "Taiex"] if keyword == "Taiwan economy" else 
@@ -679,7 +671,7 @@ fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
 st.plotly_chart(fig_map, use_container_width=True)
 
 st.subheader("📊 全球市場動能總覽")
-render_market_metrics()
+render_market_heatmap()
 
 # =========================================================
 # 🏢 房地產宏觀市場模塊 (Real Estate Module)
