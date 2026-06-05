@@ -114,22 +114,28 @@ except Exception:
 
 client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
-# 定義全球總覽的資產代號
+# 1. 定義資產代號 (保持你原本的結構)
 ASSET_CONFIG = {
-    # 股市：代表風險資產
     "🇺🇸 美國股市": "SPY",
     "🇯🇵 日本股市": "^N225",
     "🇨🇳 中國股市": "000001.SS",
     "🏢 歐洲市場(^STOXX50E)": "^STOXX50E",
-    
-    # 房地產：代表實體資產與不動產景氣
     "🌍 全球房產": "REET",
     "🏠 美國房產": "VNQ",
-    
-    
-    # 利率敏感指標：債券代表資金成本與無風險利率
     "⚖️ 美國短債 (利率指標)": "SHV",
     "⛓️ 全球債券": "BNDX"
+}
+
+# 2. 自動翻譯字典 (你可以根據需要微調)
+TRANSLATION_MAP = {
+    "🇺🇸 美國股市": "🇺🇸 US Stock",
+    "🇯🇵 日本股市": "🇯🇵 Japan Stock",
+    "🇨🇳 中國股市": "🇨🇳 China Stock",
+    "🏢 歐洲市場(^STOXX50E)": "🏢 Europe Market",
+    "🌍 全球房產": "🌍 Global RE",
+    "🏠 美國房產": "🏠 US RE",
+    "⚖️ 美國短債 (利率指標)": "⚖️ US Short Bond",
+    "⛓️ 全球債券": "⛓️ Global Bond"
 }
 
 # --- 新增房地產標的設定 ---
@@ -462,29 +468,34 @@ def get_market_data(asset_dict):
             data.append({"資產類別": name, "漲跌幅": pct_change})
     return pd.DataFrame(data)
 
-def render_market_heatmap():
+def render_market_heatmap(current_lang):
     data = []
-    for name, ticker in ASSET_CONFIG.items():
-        # 抓取最近 60 天資料
+    for zh_name, ticker in ASSET_CONFIG.items():
+        # 決定顯示名稱
+        display_name = TRANSLATION_MAP[zh_name] if current_lang == "English" else zh_name
+        
         hist = yf.Ticker(ticker).history(period="60d")
         if len(hist) >= 30:
             price_now = hist['Close'].iloc[-1]
             price_30d = hist['Close'].iloc[-30]
             pct_change = ((price_now - price_30d) / price_30d) * 100
-            data.append({"資產類別": name, "漲跌幅": pct_change})
+            data.append({"Asset": display_name, "Return": pct_change})
             
     df = pd.DataFrame(data)
     
+    # 標題與標籤翻譯
+    title_text = "Global Market Momentum (30-Day)" if current_lang == "English" else "全球市場動能總覽 (近30日)"
+    
     if not df.empty:
-        fig = px.treemap(
-            df, 
-            path=['資產類別'], 
-            values=[1]*len(df), 
-            color='漲跌幅', 
-            color_continuous_scale='RdYlGn', 
-            range_color=[-5, 5]
+        fig = px.imshow(
+            [df['Return'].values], 
+            labels=dict(x="Asset/Market", y="", color="Return %"),
+            x=df['Asset'].values,
+            y=[" "],
+            color_continuous_scale='RdYlGn',
+            aspect="auto"
         )
-        fig.update_layout(margin=dict(t=30, l=0, r=0, b=0))
+        fig.update_layout(title=title_text, height=250)
         st.plotly_chart(fig, use_container_width=True)
 
 
@@ -671,8 +682,11 @@ fig_map.update_geos(fitbounds="locations", visible=False)
 fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
 st.plotly_chart(fig_map, use_container_width=True)
 
-st.subheader("📊 全球市場動能總覽")
-render_market_heatmap()
+# 根據語系決定標題
+market_overview_title = "📊 Global Market Momentum" if language == "English" else "📊 全球市場動能總覽"
+st.subheader(market_overview_title)
+# 這裡會根據你側邊欄選擇的語系自動切換全套內容
+render_market_heatmap(language)
 
 # =========================================================
 # 🏢 房地產宏觀市場模塊 (Real Estate Module)
