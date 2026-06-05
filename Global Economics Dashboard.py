@@ -499,170 +499,131 @@ def get_market_data(asset_dict):
     return pd.DataFrame(rows)
 
 def render_market_heatmap(current_lang):
+
     data = []
+
     for zh_name, ticker in ASSET_CONFIG.items():
-        # 決定顯示名稱
-        display_name = TRANSLATION_MAP[zh_name] if current_lang == "English" else zh_name
-        
-        hist = yf.Ticker(ticker).history(period="60d")
-        if len(hist) >= 30:
-            price_now = hist['Close'].iloc[-1]
-            price_30d = hist['Close'].iloc[-30]
-            pct_change = ((price_now - price_30d) / price_30d) * 100
-            data.append({"Asset": display_name, "Return": pct_change})
-            
-    df = pd.DataFrame(data)
-    
-    # 標題與標籤翻譯
-    title_text = "Global Market Momentum (30-Day)" if current_lang == "English" else "全球市場動能總覽 (近30日)"
-    
-    if not df.empty:
-        fig = px.imshow(
-            [df['Return'].values], 
-            labels=dict(x="Asset/Market", y="", color="Return %"),
-            x=df['Asset'].values,
-            y=[" "],
-            # 這裡設定紅-黃-綠，且設定 0 為中間點
-            color_continuous_scale='RdYlGn', 
-            color_continuous_midpoint=0, 
-            aspect="auto"
+
+        display_name = (
+
+            TRANSLATION_MAP[zh_name]
+
+            if current_lang == "English"
+
+            else zh_name
+
         )
-        fig.update_layout(title=title_text, height=250)
-        st.plotly_chart(fig, use_container_width=True)
+
+        hist = yf.Ticker(ticker).history(period="60d")
+
+        if len(hist) >= 30:
+
+            price_now = hist["Close"].iloc[-1]
+
+            price_30d = hist["Close"].iloc[-30]
+
+            pct_change = (
+
+                (price_now - price_30d)
+
+                / price_30d
+
+            ) * 100
+
+            data.append({
+
+                "Asset": display_name,
+
+                "Return": pct_change
+
+            })
+
+    df = pd.DataFrame(data)
+
+    title_text = (
+
+        "Global Market Momentum (30-Day)"
+
+        if current_lang == "English"
+
+        else "全球市場動能總覽 (近30日)"
+
+    )
+
+    if not df.empty:
+
+        fig = px.imshow(
+
+            [df["Return"].values],
+
+            labels=dict(
+
+                x="Asset/Market",
+
+                y="",
+
+                color="Return %"
+
+            ),
+
+            x=df["Asset"].values,
+
+            y=[" "],
+
+            color_continuous_scale="RdYlGn",
+
+            color_continuous_midpoint=0,
+
+            aspect="auto"
+
+        )
+
+        fig.update_layout(
+
+            title=title_text,
+
+            height=250
+
+        )
+
+        st.plotly_chart(
+
+            fig,
+
+            use_container_width=True
+
+        )
+
+    return df
 
 def get_market_commentary(df, lang):
 
     if df.empty:
+        return "No data available."
 
-        return (
-
-            "No market data available."
-
-            if lang == "English"
-
-            else "目前無法取得市場資料。"
-
-        )
-
-    # 房地產相關資產
-
-    re_keywords = [
-
-        "房產",
-
-        "RE",
-
-        "VNQ",
-
-        "VNQI",
-
-        "ITB",
-
-        "REM"
-
-    ]
-
-    re_df = df[
-
-        df["Asset"].apply(
-
-            lambda x: any(
-
-                keyword in str(x)
-
-                for keyword in re_keywords
-
-            )
-
-        )
-
-    ]
-
-    avg_re = (
-
-        re_df["Return"].mean()
-
-        if not re_df.empty
-
-        else 0
-
-    )
-
-    # 整體市場平均
-
-    avg_market = df["Return"].mean()
-
-    # 最強資產
-
-    best_asset = df.loc[df["Return"].idxmax()]
-
-    worst_asset = df.loc[df["Return"].idxmin()]
+    avg_return = df["Return"].mean()
 
     if lang == "English":
 
-        if avg_market > 3:
+        if avg_return > 5:
+            return "🚀 Strong global momentum. Risk assets are outperforming."
 
-            market_regime = "Risk-On"
-
-        elif avg_market < -3:
-
-            market_regime = "Risk-Off"
+        elif avg_return < -5:
+            return "⚠️ Global markets are under pressure."
 
         else:
-
-            market_regime = "Neutral"
-
-        return (
-
-            f"🌍 Market Regime: {market_regime}\n\n"
-
-            f"Average asset performance over the last 30 days is "
-
-            f"{avg_market:.1f}%. "
-
-            f"The strongest asset is {best_asset['Asset']} "
-
-            f"({best_asset['Return']:.1f}%), while the weakest is "
-
-            f"{worst_asset['Asset']} ({worst_asset['Return']:.1f}%). "
-
-            f"Real estate related assets averaged "
-
-            f"{avg_re:.1f}% during the same period."
-
-        )
+            return "⚖️ Markets remain broadly neutral."
 
     else:
 
-        if avg_market > 3:
+        if avg_return > 5:
+            return "🚀 全球市場動能強勁，風險資產表現良好。"
 
-            market_regime = "風險偏好（Risk-On）"
-
-        elif avg_market < -3:
-
-            market_regime = "避險模式（Risk-Off）"
+        elif avg_return < -5:
+            return "⚠️ 全球市場承受壓力，風險情緒偏弱。"
 
         else:
-
-            market_regime = "中性盤整"
-
-        return (
-
-            f"🌍 市場狀態：{market_regime}\n\n"
-
-            f"近30日主要資產平均報酬率為 {avg_market:.1f}%。"
-
-            f"表現最佳的資產為 {best_asset['Asset']} "
-
-            f"（{best_asset['Return']:.1f}%），"
-
-            f"表現最弱的資產為 {worst_asset['Asset']} "
-
-            f"（{worst_asset['Return']:.1f}%）。"
-
-            f"房地產相關資產平均報酬率為 {avg_re:.1f}%。"
-
-        )
+            return "⚖️ 全球市場整體維持中性盤整格局。"
 
 # 在渲染完指標後，直接加入評論區塊
 st.divider()
@@ -865,7 +826,7 @@ render_market_heatmap(language)
 
 # =========================================================
 
-market_df = get_market_data(ASSET_CONFIG)
+market_df = render_market_heatmap(language)
 
 st.divider()
 
