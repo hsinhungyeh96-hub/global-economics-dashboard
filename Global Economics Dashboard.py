@@ -461,32 +461,39 @@ def get_market_data(asset_dict):
             data.append({"資產類別": name, "漲跌幅": pct_change})
     return pd.DataFrame(data)
 
-def render_market_heatmap():
-    data = []
+def render_market_metrics():
+    # 1. 取得數據並計算漲跌幅
+    data = {}
     for name, ticker in ASSET_CONFIG.items():
         hist = yf.Ticker(ticker).history(period="60d")
         if len(hist) >= 30:
             price_now = hist['Close'].iloc[-1]
             price_30d = hist['Close'].iloc[-30]
             pct_change = ((price_now - price_30d) / price_30d) * 100
-            data.append({"Asset": name, "Return": pct_change})
-            
-    df = pd.DataFrame(data)
+            data[name] = pct_change
     
-    if not df.empty:
-        # 使用方形熱力圖，看起來會像專業看板
-        fig = px.imshow(
-            [df['Return'].values], 
-            labels=dict(x="資產", y="", color="漲跌幅 (%)"),
-            x=df['Asset'].values,
-            y=["近30日動能"],
-            color_continuous_scale='RdYlGn',
-            aspect="auto"
-        )
-        # 優化排版
-        fig.update_xaxes(side="top") # 把標籤放上面
-        fig.update_layout(height=200, coloraxis_showscale=True)
-        st.plotly_chart(fig, use_container_width=True)
+    # 2. 分組排版 (根據資產類別)
+    # 這裡我們手動分組，讓版面更整齊
+    groups = {
+        "股市": ["🇺🇸 美股(SPY)", "🇯🇵 日股(^N225)"],
+        "房產": ["🌍 全球房產(REET)", "🏠 美國房產(VNQ)"],
+        "債券/利率": ["⚖️ 美國短債(SHV)"]
+    }
+    
+    for group_name, assets in groups.items():
+        st.markdown(f"#### {group_name}")
+        cols = st.columns(len(assets))
+        for col, asset_name in zip(cols, assets):
+            if asset_name in data:
+                val = data[asset_name]
+                # 簡化名稱，去掉 Emoji 方便顯示
+                display_name = asset_name.split(" ")[-1] 
+                col.metric(
+                    label=display_name, 
+                    value=f"{val:.2f}%", 
+                    delta=f"{val:.2f}%" if val != 0 else None
+                )
+        st.divider() # 畫一條線區隔
 
 def get_news(keyword):
     keywords_to_try = [keyword] + (["Taiwan stock market", "Taiex"] if keyword == "Taiwan economy" else 
