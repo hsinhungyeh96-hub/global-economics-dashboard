@@ -114,6 +114,23 @@ except Exception:
 
 client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
+# 定義全球總覽的資產代號
+ASSET_CONFIG = {
+    # 股市：代表風險資產
+    "🇺🇸 美國股市": "SPY",
+    "🇯🇵 日本股市": "^N225",
+    "🇨🇳 中國股市": "000001.SS",
+    
+    # 房地產：代表實體資產與不動產景氣
+    "🌍 全球房產": "REET",
+    "🏠 美國房產": "VNQ",
+    "🏢 歐洲房產": "IFEU",
+    
+    # 利率敏感指標：債券代表資金成本與無風險利率
+    "⚖️ 美國短債 (利率指標)": "SHV",
+    "⛓️ 全球債券": "BNDX"
+}
+
 # --- 新增房地產標的設定 ---
 # 涵蓋美國REITs、全球REITs、美國房屋建商、以及對標的10年期美債
 REAL_ESTATE_CONFIG = {
@@ -431,6 +448,36 @@ def fetch_real_estate_data():
 # 📰 News & Dataset Builder
 # =========================================================
 @st.cache_data(ttl=1800)
+def get_market_data(asset_dict):
+    data = []
+    for name, ticker in asset_dict.items():
+        # 抓取近 2 個月資料以計算 30 天變化
+        hist = yf.Ticker(ticker).history(period="2mo")
+        if len(hist) >= 30:
+            # 計算 30 天報酬率
+            price_now = hist['Close'].iloc[-1]
+            price_30d = hist['Close'].iloc[-30]
+            pct_change = ((price_now - price_30d) / price_30d) * 100
+            data.append({"資產類別": name, "漲跌幅": pct_change})
+    return pd.DataFrame(data)
+
+def render_market_heatmap():
+    df = get_market_data(ASSET_CONFIG)
+    if not df.empty:
+        fig = px.treemap(
+            df, 
+            path=['資產類別'], 
+            values=[1]*len(df), # 確保每個方塊大小一致
+            color='漲跌幅', 
+            color_continuous_scale='RdYlGn', # 紅-黃-綠配色
+            range_color=[-5, 5], # 設定 +/- 5% 為熱力區間
+            title="全球市場動能熱力地圖 (近30日)"
+        )
+        fig.update_layout(margin=dict(t=50, l=0, r=0, b=0))
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("目前無法載入市場數據")
+
 def get_news(keyword):
     keywords_to_try = [keyword] + (["Taiwan stock market", "Taiex"] if keyword == "Taiwan economy" else 
                                    ["China stock market", "Shanghai composite"] if keyword == "China economy" else [])
@@ -613,6 +660,9 @@ fig_map = px.choropleth(
 fig_map.update_geos(fitbounds="locations", visible=False)
 fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
 st.plotly_chart(fig_map, use_container_width=True)
+
+st.subheader("📊 全球市場動能總覽")
+render_market_heatmap()
 
 # =========================================================
 # 🏢 房地產宏觀市場模塊 (Real Estate Module)
