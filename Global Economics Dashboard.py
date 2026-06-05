@@ -672,75 +672,103 @@ if not re_chart_df.empty:
     fig_re.update_xaxes(tickformat="%Y-%m-%d")
     st.plotly_chart(fig_re, use_container_width=True)
 
-# 房地產專屬 AI 新聞總結
+# =========================================================
+# 📰 房地產各大洲專屬 AI 新聞總結
+# =========================================================
 st.subheader(T["re_news"])
-re_news_keyword = "Global real estate market housing economy"
-re_news_items = get_news(re_news_keyword)
 
-if re_news_items:
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-    with st.spinner(T["analyzing"]):
-        # 借用你寫好的 get_ai_summary 結構，但我們餵給他一個假的國家代碼來觸發
-        # 這裡為了不更動你原本的函數，我們直接在外部構建 prompt 並調用 AI (或你可以修改 get_ai_summary 讓它更通用)
-        
-        re_news_titles = [item["title"] for item in re_news_items[:5]]
-        lang_instruction = "請務必使用繁體中文。" if language == "繁體中文" else "Please output entirely in English."
-        re_prompt = f"""
-        Today is {today}.
-        Based on the following global real estate headlines, analyze the macro real estate market condition.
-        {lang_instruction}
-        Return a valid JSON object only. Do not use markdown.
-        Required format:
-        {{
-            "market_focus":"One sentence real estate market focus",
-            "stock_outlook":"REITs and housing market analysis",
-            "currency_outlook":"Impact of interest rates/yields on real estate",
-            "risk_tip":"Real estate risk warning"
-        }}
-        Headlines:
-        {chr(10).join(re_news_titles)}
-        """
-        
-        try:
-            re_response = client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[
-                    {"role": "system", "content": "You are a professional real estate macro analyst. Return valid JSON only."},
-                    {"role": "user", "content": re_prompt},
-                ],
-                stream=False,
-            )
-            re_content = re_response.choices[0].message.content.strip()
-            match = re.search(r"\{.*\}", re_content, re.DOTALL)
-            if match:
-                re_data = json.loads(match.group())
-                if language == "繁體中文":
-                    for k, v in re_data.items():
-                        if isinstance(v, str):
-                            re_data[k] = cc.convert(v)
-                
-                with st.container(border=True):
-                    st.write(f"📅 {today}")
-                    st.write(f"{T['focus']}：{re_data.get('market_focus', '')}")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown(f"**🏢 房市與 REITs 展望**")
-                        st.info(re_data.get("stock_outlook", ""))
-                    with col2:
-                        st.markdown(f"**📉 利率環境與影響**")
-                        st.info(re_data.get("currency_outlook", ""))
-                    st.markdown(f"**{T['risk']}**")
-                    st.warning(re_data.get("risk_tip", ""))
-        except Exception as e:
-            st.error(T["ai_error"])
-            
-    # 顯示原始新聞連結
-    with st.expander("閱讀最新房地產新聞" if language == "繁體中文" else "Read Latest Real Estate News"):
-        for item in re_news_items:
-            title_text = translate_text(item['title'], "zh-TW") if language == "繁體中文" else item['title']
-            st.markdown(f"- **[{title_text}]({item['link']})** ({item['date']})")
+# 1. 定義各大洲房地產新聞搜尋關鍵字
+RE_CONTINENT_KEYWORDS = {
+    "北美": "North America real estate market housing",
+    "歐洲": "Europe real estate market housing",
+    "亞洲": "Asia real estate market housing",
+    "南美": "South America real estate market housing",
+    "中東及非洲": "Middle East Africa real estate market",
+    "大洋洲": "Australia New Zealand real estate market"
+}
+
+# 2. 處理語系對應的標籤頁名稱
+if language == "English":
+    re_tab_names = ["North America", "Europe", "Asia", "South America", "Middle East & Africa", "Oceania"]
 else:
-    st.warning(T["no_news"])
+    re_tab_names = list(RE_CONTINENT_KEYWORDS.keys())
+
+# 3. 建立各大洲 Tabs
+re_tabs = st.tabs(re_tab_names)
+
+for tab, (zh_continent, keyword) in zip(re_tabs, RE_CONTINENT_KEYWORDS.items()):
+    with tab:
+        re_news_items = get_news(keyword)
+        
+        if re_news_items:
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
+            with st.spinner(T["analyzing"]):
+                re_news_titles = [item["title"] for item in re_news_items[:5]]
+                lang_instruction = "請務必使用繁體中文。" if language == "繁體中文" else "Please output entirely in English."
+                
+                # 取得當前語言的洲別名稱以放入 Prompt 幫助 AI 定位
+                continent_name = zh_continent if language == "繁體中文" else re_tab_names[list(RE_CONTINENT_KEYWORDS.keys()).index(zh_continent)]
+                
+                re_prompt = f"""
+                Today is {today}.
+                Based on the following {continent_name} real estate headlines, analyze the macro real estate market condition for this region.
+                {lang_instruction}
+                Return a valid JSON object only. Do not use markdown.
+                Required format:
+                {{
+                    "market_focus":"One sentence real estate market focus",
+                    "stock_outlook":"REITs and housing market analysis",
+                    "currency_outlook":"Impact of interest rates/yields on real estate",
+                    "risk_tip":"Real estate risk warning"
+                }}
+                Headlines:
+                {chr(10).join(re_news_titles)}
+                """
+                
+                try:
+                    re_response = client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=[
+                            {"role": "system", "content": "You are a professional real estate macro analyst. Return valid JSON only."},
+                            {"role": "user", "content": re_prompt},
+                        ],
+                        stream=False,
+                    )
+                    re_content = re_response.choices[0].message.content.strip()
+                    match = re.search(r"\{.*\}", re_content, re.DOTALL)
+                    
+                    if match:
+                        re_data = json.loads(match.group())
+                        
+                        # 繁體中文轉換
+                        if language == "繁體中文":
+                            for k, v in re_data.items():
+                                if isinstance(v, str):
+                                    re_data[k] = cc.convert(v)
+                        
+                        with st.container(border=True):
+                            st.write(f"📅 {today}")
+                            st.write(f"{T['focus']}：{re_data.get('market_focus', '')}")
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown(f"**🏢 {continent_name}房市與 REITs 展望**")
+                                st.info(re_data.get("stock_outlook", ""))
+                            with col2:
+                                st.markdown(f"**📉 利率環境與影響**")
+                                st.info(re_data.get("currency_outlook", ""))
+                            st.markdown(f"**{T['risk']}**")
+                            st.warning(re_data.get("risk_tip", ""))
+                except Exception as e:
+                    st.error(T["ai_error"])
+                    
+            # 顯示原始新聞連結
+            expander_title = "閱讀最新新聞" if language == "繁體中文" else f"Read Latest {continent_name} News"
+            with st.expander(expander_title):
+                for item in re_news_items:
+                    title_text = translate_text(item['title'], "zh-TW") if language == "繁體中文" else item['title']
+                    st.markdown(f"- **[{title_text}]({item['link']})** ({item['date']})")
+        else:
+            st.warning(T["no_news"])
 
 # =========================================================
 # 📰 Financial News & AI Cache System
