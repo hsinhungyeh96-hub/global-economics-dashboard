@@ -679,7 +679,7 @@ fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
 st.plotly_chart(fig_map, use_container_width=True)
 
 st.subheader("📊 全球市場動能總覽")
-render_market_heatmap()
+render_market_metrics()
 
 # =========================================================
 # 🏢 房地產宏觀市場模塊 (Real Estate Module)
