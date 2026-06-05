@@ -392,13 +392,11 @@ def fetch_real_estate_data():
     for name, ticker in REAL_ESTATE_CONFIG.items():
         try:
             stock = yf.Ticker(ticker)
-            # 抓取過去一年的數據作圖表
             hist = stock.history(period="1y")
             if not hist.empty:
-                # 正規化數據 (基準化為100)，方便將不同價格的ETF放在同一個圖表比較
+                # 正規化數據 (基準化為100)
                 hist_data[name] = (hist['Close'] / hist['Close'].iloc[0]) * 100
                 
-                # 計算單日與年初至今報酬
                 latest_price = hist['Close'].iloc[-1]
                 prev_price = hist['Close'].iloc[-2]
                 daily_pct = ((latest_price / prev_price) - 1) * 100
@@ -410,9 +408,21 @@ def fetch_real_estate_data():
         except Exception:
             pass
             
-    # 合併為 DataFrame 供 Plotly 使用
     if hist_data:
         df_chart = pd.DataFrame(hist_data).reset_index()
+        
+        # 📌 防錯 1：強制將第一欄重命名為 "Date"，避免因 yfinance 版本導致的名稱差異 (如 date, Datetime)
+        first_col = df_chart.columns[0]
+        df_chart.rename(columns={first_col: "Date"}, inplace=True)
+        
+        # 📌 防錯 2：將日期轉換為標準時間，並徹底「移除時區資訊」(解決 Plotly 空白圖表的主因)
+        df_chart["Date"] = pd.to_datetime(df_chart["Date"])
+        if df_chart["Date"].dt.tz is not None:
+            df_chart["Date"] = df_chart["Date"].dt.tz_localize(None)
+            
+        # 📌 防錯 3：向前/向後填補因各國休市日不同造成的 NaN 缺失值，確保 Plotly 線條連續不中斷
+        df_chart = df_chart.ffill().bfill()
+        
         return df_chart, metrics_data
     return pd.DataFrame(), {}
 
@@ -619,20 +629,23 @@ if not re_chart_df.empty:
     # 融化 DataFrame 以適應 Plotly 格式
     df_melted = re_chart_df.melt(id_vars=["Date"], var_name="Asset", value_name="Normalized Performance (Base=100)")
     
-    # 若為英文介面則替換圖例名稱
     if language == "English":
         df_melted["Asset"] = df_melted["Asset"].map(lambda x: re_name_map_en.get(x, x))
         
+    # 📌 防錯 4：移除原本有潛在報錯風險的 hover_data 自訂語法，改用乾淨流暢的預設 px.line
     fig_re = px.line(
-        df_melted, x="Date", y="Normalized Performance (Base=100)", color="Asset",
-        hover_data={"Date": "|%Y-%m-%d"}
+        df_melted, x="Date", y="Normalized Performance (Base=100)", color="Asset"
     )
+    
     fig_re.update_layout(
         hovermode="x unified",
         legend_title_text="資產標的" if language == "繁體中文" else "Assets",
         margin={"r": 0, "t": 20, "l": 0, "b": 0}, 
         height=400
     )
+    
+    # 📌 透過 update_xaxes 確保 X 軸時間顯示格式漂亮且客製化
+    fig_re.update_xaxes(tickformat="%Y-%m-%d")
     st.plotly_chart(fig_re, use_container_width=True)
 
 # 房地產專屬 AI 新聞總結
