@@ -134,12 +134,12 @@ COUNTRY_CONFIG = {
     "GBR": {"名稱": "英國", "洲": "歐洲", "匯率": "GBP=X", "指數": "^FTSE", "新聞": "United Kingdom economy", "en_name": "UK"},
     "ITA": {"名稱": "義大利", "洲": "歐洲", "匯率": "EUR=X", "指數": "FTSEMIB.MI", "新聞": "Italy economy", "en_name": "Italy"},
     "NLD": {"名稱": "荷蘭", "洲": "歐洲", "匯率": "EUR=X", "指數": "^AEX", "新聞": "Netherlands economy", "en_name": "Netherlands"},
-    "GRC": {"名稱": "希臘", "洲": "歐洲", "匯率": "EUR=X", "指數": "GREK", "新聞": "Greece economy", "en_name": "Greece"},
+    "GRC": {"名稱": "希臘", "洲": "歐洲", "匯率": "EUR=X", "指數": "ATG.AT", "新聞": "Greece economy", "en_name": "Greece"},
     "RUS": {"名稱": "俄羅斯", "洲": "歐洲", "匯率": "RUB=X", "指數": "BZ=F", "新聞": "Russia economy", "en_name": "Russia"},
 
-    "CHN": {"名稱": "中國", "洲": "亞洲", "匯率": "CNY=X", "指數": "MCHI", "新聞": "China economy", "en_name": "China"},
+    "CHN": {"名稱": "中國", "洲": "亞洲", "匯率": "CNY=X", "指數": "000300.SS", "新聞": "China economy", "en_name": "China"},
     "JPN": {"名稱": "日本", "洲": "亞洲", "匯率": "JPY=X", "指數": "^N225", "新聞": "Japan economy", "en_name": "Japan"},
-    "KOR": {"名稱": "韓國", "洲": "亞洲", "匯率": "KRW=X", "指數": "069500.KS", "新聞": "South Korea economy", "en_name": "South Korea"},
+    "KOR": {"名稱": "韓國", "洲": "亞洲", "匯率": "KRW=X", "指數": "^KS11", "新聞": "South Korea economy", "en_name": "South Korea"},
     "IND": {"名稱": "印度", "洲": "亞洲", "匯率": "INR=X", "指數": "^BSESN", "新聞": "India economy", "en_name": "India"},
     "TWN": {"名稱": "台灣", "洲": "亞洲", "匯率": "TWD=X", "指數": "^TWII", "新聞": "Taiwan economy", "en_name": "Taiwan"},
     "SGP": {"名稱": "新加坡", "洲": "亞洲", "匯率": "SGD=X", "指數": "^STI", "新聞": "Singapore economy", "en_name": "Singapore"},
@@ -247,6 +247,40 @@ def generate_regime_narrative(probs, lang):
             "🔴 市場壓力": ("🔴 市場壓力", "波動率上升且資金偏向避險資產，市場風險情緒升溫。")
         }
     return narratives[top_regime]
+
+def generate_alerts(metrics):
+
+    alerts = []
+
+    vix = metrics["恐慌指數 (VIX)"]["val"]
+    spx = metrics["標普500 (S&P500)"]["delta"]
+    yield10 = metrics["10年期美債殖利率"]["delta"]
+
+    if vix > 25 and spx < -2:
+        alerts.append(
+            "🔴 Risk-Off Signal"
+        )
+
+    if yield10 > 1 and spx < -1:
+        alerts.append(
+            "🟠 Rate Shock"
+        )
+
+    if vix < 15 and spx > 1:
+        alerts.append(
+            "🟢 Risk-On"
+        )
+
+    return alerts
+
+st.subheader(
+    "🚨 Market Alerts"
+)
+
+for alert in generate_alerts(
+    global_data
+):
+    st.warning(alert)
 
 # =========================================================
 # 🧠 Dynamic AI Engine (Native Translation)
