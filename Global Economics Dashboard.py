@@ -1,3 +1,5 @@
+import time
+import random
 import streamlit as st
 import pandas as pd
 import datetime
@@ -13,8 +15,7 @@ import traceback
 from opencc import OpenCC
 import numpy as np
 from deep_translator import GoogleTranslator
-import time
-import random
+
 
 # =========================================================
 # 🌐 UI Localization Dictionary
