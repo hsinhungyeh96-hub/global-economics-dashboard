@@ -248,39 +248,7 @@ def generate_regime_narrative(probs, lang):
         }
     return narratives[top_regime]
 
-def generate_alerts(metrics):
 
-    alerts = []
-
-    vix = metrics["恐慌指數 (VIX)"]["val"]
-    spx = metrics["標普500 (S&P500)"]["delta"]
-    yield10 = metrics["10年期美債殖利率"]["delta"]
-
-    if vix > 25 and spx < -2:
-        alerts.append(
-            "🔴 Risk-Off Signal"
-        )
-
-    if yield10 > 1 and spx < -1:
-        alerts.append(
-            "🟠 Rate Shock"
-        )
-
-    if vix < 15 and spx > 1:
-        alerts.append(
-            "🟢 Risk-On"
-        )
-
-    return alerts
-
-st.subheader(
-    "🚨 Market Alerts"
-)
-
-for alert in generate_alerts(
-    global_data
-):
-    st.warning(alert)
 
 # =========================================================
 # 🧠 Dynamic AI Engine (Native Translation)
