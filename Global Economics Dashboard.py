@@ -13,6 +13,8 @@ import traceback
 from opencc import OpenCC
 import numpy as np
 from deep_translator import GoogleTranslator
+import time
+import random
 
 # =========================================================
 # 🌐 UI Localization Dictionary
@@ -434,13 +436,19 @@ def fetch_real_estate_data():
 # 📰 News & Dataset Builder
 # =========================================================
 @st.cache_data(ttl=1800)
+import time
+import random
+
+@st.cache_data(ttl=1800)
 def get_news(keyword):
     keywords_to_try = [keyword] + (["Taiwan stock market", "Taiex"] if keyword == "Taiwan economy" else 
                                    ["China stock market", "Shanghai composite"] if keyword == "China economy" else [])
     
     for kw in keywords_to_try:
         try:
-            # 📌 防錯重點：不要自己把變數塞進字串，改用 params 讓 requests 自動做 URL 安全編碼
+            # 🌟 關鍵修正：在每次請求 Google 前，強制休息 0.5 到 1.5 秒
+            time.sleep(random.uniform(0.5, 1.5))
+            
             url = "https://news.google.com/rss/search"
             payload = {
                 "q": kw,
@@ -449,10 +457,16 @@ def get_news(keyword):
                 "ceid": "US:en"
             }
             
-            response = session.get(url, params=payload, timeout=10)
+            # 🌟 建議加上更多的 Headers，偽裝成真實瀏覽器
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9"
+            }
             
-            # 只有當 HTTP 狀態碼為 200 (成功) 時才解析
-            if response.status_code == 200:
+            response = session.get(url, params=payload, headers=headers, timeout=10)
+            
+            # 只有當 HTTP 狀態碼為 200 (成功) 且內容確定是 XML 時才解析
+            if response.status_code == 200 and "xml" in response.text[:50].lower():
                 root = ET.fromstring(response.content)
                 items = root.findall(".//item")
                 if items:
@@ -464,11 +478,13 @@ def get_news(keyword):
                         } for i in items[:5]
                     ]
             else:
-                # 若 Google 暫時阻擋或回傳 500，印出警告但不讓程式崩潰
-                print(f"Google News RSS 請求失敗: {response.status_code} for keyword: {kw}")
+                print(f"Google 拒絕請求 (代碼: {response.status_code})，可能遇到 500 Error。")
                 
+        except ET.ParseError:
+            print(f"XML 解析錯誤：Google 可能回傳了 500 HTML 網頁而非 XML。")
+            continue
         except Exception as e:
-            print(f"解析新聞發生錯誤: {e}")
+            print(f"獲取新聞發生未預期錯誤: {e}")
             continue
             
     return []
