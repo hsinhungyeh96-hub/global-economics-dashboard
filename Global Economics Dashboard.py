@@ -437,10 +437,6 @@ def fetch_real_estate_data():
 # 📰 News & Dataset Builder
 # =========================================================
 @st.cache_data(ttl=1800)
-import time
-import random
-
-@st.cache_data(ttl=1800)
 def get_news(keyword):
     keywords_to_try = [keyword] + (["Taiwan stock market", "Taiex"] if keyword == "Taiwan economy" else 
                                    ["China stock market", "Shanghai composite"] if keyword == "China economy" else [])
