@@ -138,7 +138,7 @@ COUNTRY_CONFIG = {
     "ITA": {"名稱": "義大利", "洲": "歐洲", "匯率": "EUR=X", "指數": "FTSEMIB.MI", "新聞": "Italy economy", "en_name": "Italy"},
     "NLD": {"名稱": "荷蘭", "洲": "歐洲", "匯率": "EUR=X", "指數": "^AEX", "新聞": "Netherlands economy", "en_name": "Netherlands"},
     "GRC": {"名稱": "希臘", "洲": "歐洲", "匯率": "EUR=X", "指數": "GREK", "新聞": "Greece economy", "en_name": "Greece"},
-    "CHE": {"名稱": "瑞士", "洲": "歐洲", "匯率": "CHF=X", "指數": "^SSMI", "新聞": "Switzerland economy", "en_name": "Switzerland"}
+    "CHE": {"名稱": "瑞士", "洲": "歐洲", "匯率": "CHF=X", "指數": "^SSMI", "新聞": "Switzerland economy", "en_name": "Switzerland"},
     "RUS": {"名稱": "俄羅斯", "洲": "歐洲", "匯率": "RUB=X", "指數": "BZ=F", "新聞": "Russia economy", "en_name": "Russia"},
 
     "CHN": {"名稱": "中國", "洲": "亞洲", "匯率": "CNY=X", "指數": "^HSI", "新聞": "China economy", "en_name": "China"},
