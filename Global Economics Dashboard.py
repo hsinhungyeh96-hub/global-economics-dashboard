@@ -157,7 +157,7 @@ COUNTRY_CONFIG = {
     "NZL": {"名稱": "紐西蘭", "洲": "大洋洲", "匯率": "NZD=X", "指數": "^NZ50", "新聞": "New Zealand economy", "en_name": "New Zealand"}
 }
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(ttl=86400, show_spinner=False, max_entries=1000)
 def translate_text(text, target_lang):
     if not text: return text
     try: return GoogleTranslator(source="auto", target=target_lang).translate(text)
@@ -310,6 +310,7 @@ Headlines:
     try:
         response = client.chat.completions.create(
             model="deepseek-chat",
+            response_format={"type": "json_object"}, # 加上這行
             messages=[
                 {
                     "role": "system",
