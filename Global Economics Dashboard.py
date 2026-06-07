@@ -1,5 +1,3 @@
-import time
-import random
 import streamlit as st
 import pandas as pd
 import datetime
@@ -15,7 +13,6 @@ import traceback
 from opencc import OpenCC
 import numpy as np
 from deep_translator import GoogleTranslator
-
 
 # =========================================================
 # 🌐 UI Localization Dictionary
@@ -138,7 +135,6 @@ COUNTRY_CONFIG = {
     "ITA": {"名稱": "義大利", "洲": "歐洲", "匯率": "EUR=X", "指數": "FTSEMIB.MI", "新聞": "Italy economy", "en_name": "Italy"},
     "NLD": {"名稱": "荷蘭", "洲": "歐洲", "匯率": "EUR=X", "指數": "^AEX", "新聞": "Netherlands economy", "en_name": "Netherlands"},
     "GRC": {"名稱": "希臘", "洲": "歐洲", "匯率": "EUR=X", "指數": "GREK", "新聞": "Greece economy", "en_name": "Greece"},
-    "CHE": {"名稱": "瑞士", "洲": "歐洲", "匯率": "CHF=X", "指數": "^SSMI", "新聞": "Switzerland economy", "en_name": "Switzerland"},
     "RUS": {"名稱": "俄羅斯", "洲": "歐洲", "匯率": "RUB=X", "指數": "BZ=F", "新聞": "Russia economy", "en_name": "Russia"},
 
     "CHN": {"名稱": "中國", "洲": "亞洲", "匯率": "CNY=X", "指數": "^HSI", "新聞": "China economy", "en_name": "China"},
@@ -161,7 +157,7 @@ COUNTRY_CONFIG = {
     "NZL": {"名稱": "紐西蘭", "洲": "大洋洲", "匯率": "NZD=X", "指數": "^NZ50", "新聞": "New Zealand economy", "en_name": "New Zealand"}
 }
 
-@st.cache_data(ttl=86400, show_spinner=False, max_entries=1000)
+@st.cache_data(ttl=86400, show_spinner=False)
 def translate_text(text, target_lang):
     if not text: return text
     try: return GoogleTranslator(source="auto", target=target_lang).translate(text)
@@ -275,7 +271,7 @@ def get_ai_summary(country_code, date_str, lang):
 
         }
 
-    news_titles = [item["title"] for item in news_items[:15]]
+    news_titles = [item["title"] for item in news_items[:5]]
 
     lang_instruction = (
         "請務必使用繁體中文。"
@@ -314,7 +310,6 @@ Headlines:
     try:
         response = client.chat.completions.create(
             model="deepseek-chat",
-            response_format={"type": "json_object"}, # 加上這行
             messages=[
                 {
                     "role": "system",
@@ -444,9 +439,7 @@ def get_news(keyword):
     
     for kw in keywords_to_try:
         try:
-            # 🌟 關鍵修正：在每次請求 Google 前，強制休息 0.5 到 1.5 秒
-            time.sleep(random.uniform(0.5, 1.5))
-            
+            # 📌 防錯重點：不要自己把變數塞進字串，改用 params 讓 requests 自動做 URL 安全編碼
             url = "https://news.google.com/rss/search"
             payload = {
                 "q": kw,
@@ -455,16 +448,10 @@ def get_news(keyword):
                 "ceid": "US:en"
             }
             
-            # 🌟 建議加上更多的 Headers，偽裝成真實瀏覽器
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept-Language": "en-US,en;q=0.9"
-            }
+            response = session.get(url, params=payload, timeout=10)
             
-            response = session.get(url, params=payload, headers=headers, timeout=10)
-            
-            # 只有當 HTTP 狀態碼為 200 (成功) 且內容確定是 XML 時才解析
-            if response.status_code == 200 and "xml" in response.text[:50].lower():
+            # 只有當 HTTP 狀態碼為 200 (成功) 時才解析
+            if response.status_code == 200:
                 root = ET.fromstring(response.content)
                 items = root.findall(".//item")
                 if items:
@@ -476,13 +463,11 @@ def get_news(keyword):
                         } for i in items[:5]
                     ]
             else:
-                print(f"Google 拒絕請求 (代碼: {response.status_code})，可能遇到 500 Error。")
+                # 若 Google 暫時阻擋或回傳 500，印出警告但不讓程式崩潰
+                print(f"Google News RSS 請求失敗: {response.status_code} for keyword: {kw}")
                 
-        except ET.ParseError:
-            print(f"XML 解析錯誤：Google 可能回傳了 500 HTML 網頁而非 XML。")
-            continue
         except Exception as e:
-            print(f"獲取新聞發生未預期錯誤: {e}")
+            print(f"解析新聞發生錯誤: {e}")
             continue
             
     return []
@@ -692,13 +677,13 @@ if not re_chart_df.empty:
 def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
     # 設定標題語系
     if current_lang == "English":
-        title = "🔍 US Real Estate Risk Premium"
+        title = "🔍 Real Estate Risk Premium"
         label1, label2, label3 = "REITs Yield (VNQ)", "Risk-Free Rate (10Y)", "Risk Premium (Spread)"
         msg_err = "⚠️ Warning: REITs yield is lower than the risk-free rate! This often signals overvaluation or extreme bond market sell-off."
         msg_warn = "⚖️ Observation: Risk premium is tightening. REITs attractiveness is waning; proceed with caution."
         msg_succ = "✅ Healthy: Real Estate still offers a reasonable risk premium. Attractive for allocation."
     else:
-        title = "🔍 美國房地產風險溢價分析"
+        title = "🔍 房地產風險溢價分析"
         label1, label2, label3 = "房地產收益率 (VNQ)", "無風險利率 (10Y)", "風險溢價 (Spread)"
         msg_err = "⚠️ 警示：房地產殖利率低於無風險利率！這通常代表房地產資產估值過高或債市出現極端拋售。"
         msg_warn = "⚖️ 觀察：風險溢價收窄。房地產的吸引力正在減弱，建議謹慎配置。"
@@ -735,34 +720,25 @@ def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
 render_yield_spread(language)
 
 # =========================================================
-# 📰 房地產各大洲專屬 AI 新聞總結 (優化版)
+# 📰 房地產各大洲專屬 AI 新聞總結
 # =========================================================
 st.subheader(T["re_news"])
 
-# 1. 獨立出 AI 總結函數，並設定 ttl=86400 (24小時)，確保一天只消耗一次 Token
+# 1. 獨立出 AI 總結函數，並設定 ttl=86400 (24小時)，確保一天只消耗一次 Token！
 @st.cache_data(ttl=86400)
 def fetch_re_ai_summary(continent_name, news_titles_tuple, today_str, lang_instruction):
-    # 增強版 Prompt：加入市場 Regime 判斷與結構化思維限制
     re_prompt = f"""
     Today is {today_str}.
-    Role: You are a senior Macro-Real Estate Analyst.
-    Task: Analyze the following {continent_name} real estate headlines to provide a professional market outlook.
-    Instructions:
-    1. Synthesize the provided headlines to identify the "Market Regime" (e.g., Bullish, Bearish, Stable, or Correction).
-    2. Specifically comment on how interest rate trends mentioned in the news impact REITs/Property valuations.
-    3. Be objective; if news is conflicting, state both perspectives.
-    4. {lang_instruction}
-    
-    Return a valid JSON object ONLY. Do not use markdown.
+    Based on the following {continent_name} real estate headlines, analyze the macro real estate market condition for this region.
+    {lang_instruction}
+    Return a valid JSON object only. Do not use markdown.
     Required format:
     {{
-        "market_focus": "Specific market driver identified from headlines (One sentence)",
-        "market_regime": "Current market sentiment and status (e.g., Defensive, Aggressive, Correction)",
-        "stock_outlook": "Deep dive into REITs and regional housing market trends",
-        "currency_outlook": "Connection between central bank policies/interest rates and real estate capital flows",
-        "risk_tip": "One actionable risk indicator or warning to watch"
+        "market_focus":"One sentence real estate market focus",
+        "stock_outlook":"REITs and housing market analysis",
+        "currency_outlook":"Impact of interest rates/yields on real estate",
+        "risk_tip":"Real estate risk warning"
     }}
-    
     Headlines:
     {chr(10).join(news_titles_tuple)}
     """
@@ -770,11 +746,10 @@ def fetch_re_ai_summary(continent_name, news_titles_tuple, today_str, lang_instr
         re_response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "You are a professional real estate macro analyst. Return valid JSON only without markdown formatting."},
+                {"role": "system", "content": "You are a professional real estate macro analyst. Return valid JSON only."},
                 {"role": "user", "content": re_prompt},
             ],
             stream=False,
-            temperature=0.3, # 加上較低的 temperature 讓分析更客觀穩定
         )
         re_content = re_response.choices[0].message.content.strip()
         match = re.search(r"\{.*\}", re_content, re.DOTALL)
@@ -784,14 +759,14 @@ def fetch_re_ai_summary(continent_name, news_titles_tuple, today_str, lang_instr
         print(f"AI 解析錯誤 ({continent_name}): {e}")
     return None
 
-# 2. 優化各大洲房地產新聞搜尋關鍵字 (增加精準度)
+# 2. 定義各大洲房地產新聞搜尋關鍵字
 RE_CONTINENT_KEYWORDS = {
-    "北美": "North America REITs interest rate housing market trends",
-    "歐洲": "Europe property market ECB interest rates commercial real estate",
-    "亞洲": "Asia real estate market Asia-Pacific REITs urban housing",
+    "北美": "North America real estate market housing",
+    "歐洲": "Europe real estate market housing",
+    "亞洲": "Asia real estate market housing",
     "南美": "South America real estate market housing",
-    "中東及非洲": "Middle East Africa real estate property market",
-    "大洋洲": "Australia New Zealand real estate property market"
+    "中東及非洲": "Middle East Africa real estate market",
+    "大洋洲": "Australia New Zealand real estate market"
 }
 
 if language == "English":
@@ -809,50 +784,34 @@ for tab, (zh_continent, keyword) in zip(re_tabs, RE_CONTINENT_KEYWORDS.items()):
         if re_news_items:
             today_str = datetime.datetime.now().strftime("%Y-%m-%d")
             with st.spinner(T["analyzing"]):
-                
-                # 📌 優化：新聞去重 (Deduplication) 並擴充至 10 則
-                unique_news_items = []
-                seen_titles = set()
-                for item in re_news_items:
-                    if item["title"] not in seen_titles:
-                        unique_news_items.append(item)
-                        seen_titles.add(item["title"])
-                    if len(unique_news_items) >= 10:  # 抓取 10 則去重後的新聞提供給 AI
-                        break
-                        
-                # 將 List 轉為 Tuple，確保 Streamlit 快取能正確 hash
-                re_news_titles = tuple([item["title"] for item in unique_news_items])
-                
-                lang_instruction = "請務必使用繁體中文輸出。" if language == "繁體中文" else "Please output entirely in English."
+                # 將 List 轉為 Tuple，因為 Streamlit 的 cache 函數參數必須是可雜湊的 (hashable)
+                re_news_titles = tuple([item["title"] for item in re_news_items[:5]])
+                lang_instruction = "請務必使用繁體中文。" if language == "繁體中文" else "Please output entirely in English."
                 continent_name = zh_continent if language == "繁體中文" else re_tab_names[list(RE_CONTINENT_KEYWORDS.keys()).index(zh_continent)]
                 
-                # 呼叫快取函數 (真正省 Token 的地方)
+                # 呼叫快取函數 (這裡才會真正省 Token！)
                 re_data = fetch_re_ai_summary(continent_name, re_news_titles, today_str, lang_instruction)
                 
                 if re_data:
-                    # 繁體中文轉換 (OpenCC)
+                    # 繁體中文轉換
                     if language == "繁體中文":
                         for k, v in re_data.items():
                             if isinstance(v, str):
                                 re_data[k] = cc.convert(v)
                     
                     with st.container(border=True):
-                        # 動態決定語系標籤
+                        # 📌 修正：根據使用者選擇的語言，動態決定小標題的文字
                         if language == "English":
                             focus_label = "Focus: "
-                            regime_label = "Market Regime: "
                             col1_header = f"**🏢 {continent_name} Real Estate & REITs Outlook**"
                             col2_header = "**📉 Interest Rate Environment & Impact**"
                         else:
                             focus_label = f"{T['focus']}："
-                            regime_label = "🧠 市場態勢："
                             col1_header = f"**🏢 {continent_name}房市與 REITs 展望**"
                             col2_header = "**📉 利率環境與影響**"
 
                         st.write(f"📅 {today_str}")
-                        # 📌 新增：顯示焦點與市場態勢 (Regime)
-                        st.markdown(f"**{focus_label}** {re_data.get('market_focus', '')}")
-                        st.markdown(f"**{regime_label}** `{re_data.get('market_regime', 'N/A')}`") 
+                        st.write(f"**{focus_label}**{re_data.get('market_focus', '')}")
                         
                         col1, col2 = st.columns(2)
                         with col1:
@@ -867,12 +826,12 @@ for tab, (zh_continent, keyword) in zip(re_tabs, RE_CONTINENT_KEYWORDS.items()):
                 else:
                     st.error(T["ai_error"])
                     
-            # 📌 顯示原始新聞連結 (改為顯示去重後的 unique_news_items)
+            # 顯示原始新聞連結
             expander_title = "閱讀最新新聞" if language == "繁體中文" else f"Read Latest {continent_name} News"
             with st.expander(expander_title):
-                for item in unique_news_items:
+                for item in re_news_items:
                     title_text = translate_text(item['title'], "zh-TW") if language == "繁體中文" else item['title']
-                    st.markdown(f"- **[{title_text}]({item['link']})**")
+                    st.markdown(f"- **[{title_text}]({item['link']})** ({item['date']})")
         else:
             st.warning(T["no_news"])
 # =========================================================
