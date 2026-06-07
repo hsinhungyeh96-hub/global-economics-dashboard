@@ -735,25 +735,34 @@ def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
 render_yield_spread(language)
 
 # =========================================================
-# 📰 房地產各大洲專屬 AI 新聞總結
+# 📰 房地產各大洲專屬 AI 新聞總結 (優化版)
 # =========================================================
 st.subheader(T["re_news"])
 
-# 1. 獨立出 AI 總結函數，並設定 ttl=86400 (24小時)，確保一天只消耗一次 Token！
+# 1. 獨立出 AI 總結函數，並設定 ttl=86400 (24小時)，確保一天只消耗一次 Token
 @st.cache_data(ttl=86400)
 def fetch_re_ai_summary(continent_name, news_titles_tuple, today_str, lang_instruction):
+    # 增強版 Prompt：加入市場 Regime 判斷與結構化思維限制
     re_prompt = f"""
     Today is {today_str}.
-    Based on the following {continent_name} real estate headlines, analyze the macro real estate market condition for this region.
-    {lang_instruction}
-    Return a valid JSON object only. Do not use markdown.
+    Role: You are a senior Macro-Real Estate Analyst.
+    Task: Analyze the following {continent_name} real estate headlines to provide a professional market outlook.
+    Instructions:
+    1. Synthesize the provided headlines to identify the "Market Regime" (e.g., Bullish, Bearish, Stable, or Correction).
+    2. Specifically comment on how interest rate trends mentioned in the news impact REITs/Property valuations.
+    3. Be objective; if news is conflicting, state both perspectives.
+    4. {lang_instruction}
+    
+    Return a valid JSON object ONLY. Do not use markdown.
     Required format:
     {{
-        "market_focus":"One sentence real estate market focus",
-        "stock_outlook":"REITs and housing market analysis",
-        "currency_outlook":"Impact of interest rates/yields on real estate",
-        "risk_tip":"Real estate risk warning"
+        "market_focus": "Specific market driver identified from headlines (One sentence)",
+        "market_regime": "Current market sentiment and status (e.g., Defensive, Aggressive, Correction)",
+        "stock_outlook": "Deep dive into REITs and regional housing market trends",
+        "currency_outlook": "Connection between central bank policies/interest rates and real estate capital flows",
+        "risk_tip": "One actionable risk indicator or warning to watch"
     }}
+    
     Headlines:
     {chr(10).join(news_titles_tuple)}
     """
@@ -761,10 +770,11 @@ def fetch_re_ai_summary(continent_name, news_titles_tuple, today_str, lang_instr
         re_response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "You are a professional real estate macro analyst. Return valid JSON only."},
+                {"role": "system", "content": "You are a professional real estate macro analyst. Return valid JSON only without markdown formatting."},
                 {"role": "user", "content": re_prompt},
             ],
             stream=False,
+            temperature=0.3, # 加上較低的 temperature 讓分析更客觀穩定
         )
         re_content = re_response.choices[0].message.content.strip()
         match = re.search(r"\{.*\}", re_content, re.DOTALL)
@@ -774,14 +784,14 @@ def fetch_re_ai_summary(continent_name, news_titles_tuple, today_str, lang_instr
         print(f"AI 解析錯誤 ({continent_name}): {e}")
     return None
 
-# 2. 定義各大洲房地產新聞搜尋關鍵字
+# 2. 優化各大洲房地產新聞搜尋關鍵字 (增加精準度)
 RE_CONTINENT_KEYWORDS = {
-    "北美": "North America real estate market housing",
-    "歐洲": "Europe real estate market housing",
-    "亞洲": "Asia real estate market housing",
+    "北美": "North America REITs interest rate housing market trends",
+    "歐洲": "Europe property market ECB interest rates commercial real estate",
+    "亞洲": "Asia real estate market Asia-Pacific REITs urban housing",
     "南美": "South America real estate market housing",
-    "中東及非洲": "Middle East Africa real estate market",
-    "大洋洲": "Australia New Zealand real estate market"
+    "中東及非洲": "Middle East Africa real estate property market",
+    "大洋洲": "Australia New Zealand real estate property market"
 }
 
 if language == "English":
@@ -799,34 +809,50 @@ for tab, (zh_continent, keyword) in zip(re_tabs, RE_CONTINENT_KEYWORDS.items()):
         if re_news_items:
             today_str = datetime.datetime.now().strftime("%Y-%m-%d")
             with st.spinner(T["analyzing"]):
-                # 將 List 轉為 Tuple，因為 Streamlit 的 cache 函數參數必須是可雜湊的 (hashable)
-                re_news_titles = tuple([item["title"] for item in re_news_items[:5]])
-                lang_instruction = "請務必使用繁體中文。" if language == "繁體中文" else "Please output entirely in English."
+                
+                # 📌 優化：新聞去重 (Deduplication) 並擴充至 10 則
+                unique_news_items = []
+                seen_titles = set()
+                for item in re_news_items:
+                    if item["title"] not in seen_titles:
+                        unique_news_items.append(item)
+                        seen_titles.add(item["title"])
+                    if len(unique_news_items) >= 10:  # 抓取 10 則去重後的新聞提供給 AI
+                        break
+                        
+                # 將 List 轉為 Tuple，確保 Streamlit 快取能正確 hash
+                re_news_titles = tuple([item["title"] for item in unique_news_items])
+                
+                lang_instruction = "請務必使用繁體中文輸出。" if language == "繁體中文" else "Please output entirely in English."
                 continent_name = zh_continent if language == "繁體中文" else re_tab_names[list(RE_CONTINENT_KEYWORDS.keys()).index(zh_continent)]
                 
-                # 呼叫快取函數 (這裡才會真正省 Token！)
+                # 呼叫快取函數 (真正省 Token 的地方)
                 re_data = fetch_re_ai_summary(continent_name, re_news_titles, today_str, lang_instruction)
                 
                 if re_data:
-                    # 繁體中文轉換
+                    # 繁體中文轉換 (OpenCC)
                     if language == "繁體中文":
                         for k, v in re_data.items():
                             if isinstance(v, str):
                                 re_data[k] = cc.convert(v)
                     
                     with st.container(border=True):
-                        # 📌 修正：根據使用者選擇的語言，動態決定小標題的文字
+                        # 動態決定語系標籤
                         if language == "English":
                             focus_label = "Focus: "
+                            regime_label = "Market Regime: "
                             col1_header = f"**🏢 {continent_name} Real Estate & REITs Outlook**"
                             col2_header = "**📉 Interest Rate Environment & Impact**"
                         else:
                             focus_label = f"{T['focus']}："
+                            regime_label = "🧠 市場態勢："
                             col1_header = f"**🏢 {continent_name}房市與 REITs 展望**"
                             col2_header = "**📉 利率環境與影響**"
 
                         st.write(f"📅 {today_str}")
-                        st.write(f"**{focus_label}**{re_data.get('market_focus', '')}")
+                        # 📌 新增：顯示焦點與市場態勢 (Regime)
+                        st.markdown(f"**{focus_label}** {re_data.get('market_focus', '')}")
+                        st.markdown(f"**{regime_label}** `{re_data.get('market_regime', 'N/A')}`") 
                         
                         col1, col2 = st.columns(2)
                         with col1:
@@ -841,12 +867,12 @@ for tab, (zh_continent, keyword) in zip(re_tabs, RE_CONTINENT_KEYWORDS.items()):
                 else:
                     st.error(T["ai_error"])
                     
-            # 顯示原始新聞連結
+            # 📌 顯示原始新聞連結 (改為顯示去重後的 unique_news_items)
             expander_title = "閱讀最新新聞" if language == "繁體中文" else f"Read Latest {continent_name} News"
             with st.expander(expander_title):
-                for item in re_news_items:
+                for item in unique_news_items:
                     title_text = translate_text(item['title'], "zh-TW") if language == "繁體中文" else item['title']
-                    st.markdown(f"- **[{title_text}]({item['link']})** ({item['date']})")
+                    st.markdown(f"- **[{title_text}]({item['link']})**")
         else:
             st.warning(T["no_news"])
 # =========================================================
