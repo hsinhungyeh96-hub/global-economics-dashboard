@@ -692,13 +692,13 @@ if not re_chart_df.empty:
 def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
     # 設定標題語系
     if current_lang == "English":
-        title = "🔍 Real Estate Risk Premium"
+        title = "🔍 US Real Estate Risk Premium"
         label1, label2, label3 = "REITs Yield (VNQ)", "Risk-Free Rate (10Y)", "Risk Premium (Spread)"
         msg_err = "⚠️ Warning: REITs yield is lower than the risk-free rate! This often signals overvaluation or extreme bond market sell-off."
         msg_warn = "⚖️ Observation: Risk premium is tightening. REITs attractiveness is waning; proceed with caution."
         msg_succ = "✅ Healthy: Real Estate still offers a reasonable risk premium. Attractive for allocation."
     else:
-        title = "🔍 房地產風險溢價分析"
+        title = "🔍 美國房地產風險溢價分析"
         label1, label2, label3 = "房地產收益率 (VNQ)", "無風險利率 (10Y)", "風險溢價 (Spread)"
         msg_err = "⚠️ 警示：房地產殖利率低於無風險利率！這通常代表房地產資產估值過高或債市出現極端拋售。"
         msg_warn = "⚖️ 觀察：風險溢價收窄。房地產的吸引力正在減弱，建議謹慎配置。"
