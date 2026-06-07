@@ -275,7 +275,7 @@ def get_ai_summary(country_code, date_str, lang):
 
         }
 
-    news_titles = [item["title"] for item in news_items[:5]]
+    news_titles = [item["title"] for item in news_items[:15]]
 
     lang_instruction = (
         "請務必使用繁體中文。"
