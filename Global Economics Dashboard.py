@@ -624,20 +624,20 @@ st.header(T["re_header"])
 
 re_chart_df, re_metrics = fetch_real_estate_data()
 
+# 💡 定義房地產資產的英文字典（供圖表與 Metric 共同使用）
+re_name_map_en = {
+    "美國房地產 (VNQ)": "US Real Estate (VNQ)",
+    "全球不含美房市 (VNQI)": "Global ex-US RE (VNQI)",
+    "美國房屋建商 (ITB)": "US Homebuilders (ITB)",
+    "商業不動產抵押 (REM)": "Mortgage REITs (REM)",
+    "10年期美債殖利率": "10Y Treasury Yield"
+}
+
 if re_metrics:
     st.subheader(T["re_metrics"])
     # 動態產生 Metric Columns
     re_cols = st.columns(len(REAL_ESTATE_CONFIG))
     
-    # 對應英文名稱 (若選擇英文介面)
-    re_name_map_en = {
-        "美國房地產 (VNQ)": "US Real Estate (VNQ)",
-        "全球不含美房市 (VNQI)": "Global ex-US RE (VNQI)",
-        "美國房屋建商 (ITB)": "US Homebuilders (ITB)",
-        "商業不動產抵押 (REM)": "Mortgage REITs (REM)",
-        "10年期美債殖利率": "10Y Treasury Yield"
-    }
-
     for i, (zh_name, data) in enumerate(re_metrics.items()):
         display_name = re_name_map_en.get(zh_name, zh_name) if language == "English" else zh_name
         with re_cols[i]:
@@ -658,7 +658,7 @@ if not re_chart_df.empty:
     if language == "English":
         df_melted["Asset"] = df_melted["Asset"].map(lambda x: re_name_map_en.get(x, x))
         
-    # 📌 防錯 4：移除原本有潛在報錯風險的 hover_data 自訂語法，改用乾淨流暢的預設 px.line
+    # 📌 移除潛在報錯風險的 hover_data 自訂語法，改用乾淨流暢的預設 px.line
     fig_re = px.line(
         df_melted, x="Date", y="Normalized Performance (Base=100)", color="Asset"
     )
@@ -673,6 +673,33 @@ if not re_chart_df.empty:
     # 📌 透過 update_xaxes 確保 X 軸時間顯示格式漂亮且客製化
     fig_re.update_xaxes(tickformat="%Y-%m-%d")
     st.plotly_chart(fig_re, use_container_width=True)
+
+
+# --- 🛡️ 核心防錯：獨立出獲取殖利率的快取函數，ttl 設定 1 小時 ---
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_yield_spread_data(vnq_ticker="VNQ", treasury_ticker="^TNX"):
+    try:
+        vnq = yf.Ticker(vnq_ticker)
+        tnx = yf.Ticker(treasury_ticker)
+        
+        # 透過快取隔離 info 呼叫，徹底封鎖 YFRateLimitError
+        info = vnq.info
+        raw_yield = info.get('dividendYield', 0.04) 
+        if raw_yield > 1: 
+            raw_yield = raw_yield / 100 
+        
+        vnq_yield = raw_yield * 100
+        
+        # 獲取美債最新收盤價
+        tnx_hist = tnx.history(period="5d")
+        tnx_yield = tnx_hist['Close'].iloc[-1] if not tnx_hist.empty else 4.0
+        
+        return vnq_yield, tnx_yield
+    except Exception as e:
+        print(f"Fetch Yield Spread Error: {e}")
+        # 如果 yfinance 暫時抽風，提供一組合理的市場預設值防崩潰
+        return 4.2, 4.3 
+
 
 def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
     # 設定標題語系
@@ -691,15 +718,8 @@ def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
 
     st.markdown(f"### {title}")
     
-    # 計算邏輯 (保持不變)
-    vnq = yf.Ticker(vnq_ticker)
-    tnx = yf.Ticker(treasury_ticker)
-    info = vnq.info
-    raw_yield = info.get('dividendYield', 0.04) 
-    if raw_yield > 1: raw_yield = raw_yield / 100 
-    
-    vnq_yield = raw_yield * 100
-    tnx_yield = tnx.history(period="1d")['Close'].iloc[-1]
+    # 🚀 從剛剛定義的快取函數撈數據，安全、乾淨、不踩雷
+    vnq_yield, tnx_yield = fetch_yield_spread_data(vnq_ticker, treasury_ticker)
     spread = vnq_yield - tnx_yield
     
     # 顯示指標
@@ -716,7 +736,7 @@ def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
     else:
         st.success(msg_succ)
 
-# 最後在主程式區塊呼叫 (記得帶入語系參數)
+# 最後在主程式區塊呼叫
 render_yield_spread(language)
 
 # =========================================================
