@@ -1041,12 +1041,38 @@ def fetch_re_ai_summary(continent_name, news_titles_tuple, today_str, lang_instr
 
 # 2. 定義各大洲房地產新聞搜尋關鍵字
 RE_CONTINENT_KEYWORDS = {
-    "北美": "North America real estate market housing",
-    "歐洲": "Europe real estate market housing",
-    "亞洲": "Asia real estate market housing",
-    "南美": "South America real estate market housing",
-    "中東及非洲": "Middle East Africa real estate market",
-    "大洋洲": "Australia New Zealand real estate market"
+    "北美": """
+    US OR Canada OR Mexico
+    real estate OR housing OR property OR REIT
+    """,
+
+    "歐洲": """
+    UK OR Germany OR France OR Spain OR Italy OR Netherlands
+    OR Sweden OR Poland OR Portugal
+    real estate OR housing OR property market OR REIT
+    """,
+
+    "亞洲": """
+    China OR Japan OR South Korea OR Singapore
+    OR India OR Taiwan OR Hong Kong
+    real estate OR housing OR property market
+    """,
+
+    "南美": """
+    Brazil OR Argentina OR Chile OR Colombia
+    real estate OR housing OR property market
+    """,
+
+    "中東及非洲": """
+    UAE OR Saudi Arabia OR Qatar OR Egypt
+    OR South Africa OR Kenya
+    real estate OR property market
+    """,
+
+    "大洋洲": """
+    Australia OR New Zealand
+    real estate OR housing market
+    """
 }
 
 if language == "English":
