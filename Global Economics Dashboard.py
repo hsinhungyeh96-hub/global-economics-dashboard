@@ -1100,9 +1100,9 @@ RE_CONTINENT_KEYWORDS = {
     """,
 
     "南美": """
-    Brazil OR Argentina OR Chile OR Colombia
-    real estate OR property OR housing
-    OR commercial property
+    Brazil property market
+    OR Brazil real estate
+    OR Latin America real estate
     """,
 
     "中東及非洲": """
