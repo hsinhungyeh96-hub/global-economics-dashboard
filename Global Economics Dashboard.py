@@ -510,7 +510,18 @@ language = st.sidebar.selectbox("🌐 Language", ["繁體中文", "English"])
 T = TEXT[language] # Simplify dictionary access
 
 with st.spinner(T["syncing"]):
-    df = build_dataset()
+    df_cached = build_dataset()
+    df = df_cached.copy()
+
+# ─── 🎯 全球股市與匯率：手動覆蓋 NaN 資料 ───
+overrides = load_overrides()
+for index, row in df.iterrows():
+    code = row["國家代碼"]
+    for col in ["指數點位", "單日指數漲跌幅 (%)", "年初指數至今報酬 (%)", "單日匯率漲跌幅 (%)", "市場波動率 (%)"]:
+        override_key = f"{code}_{col}"
+        # 如果原本是 NaN 且管理員有手動覆蓋紀錄，就替換進去
+        if pd.isna(row[col]) and override_key in overrides:
+            df.at[index, col] = float(overrides[override_key])
 
 st.title(T["title"])
 st.caption(T["caption"])
@@ -712,21 +723,53 @@ st.plotly_chart(fig_pie, use_container_width=True)
 # 📋 Data Table & Heatmap
 # =========================================================
 st.header(T["overview_header"])
+
+# 【🛠️ 全球股市與匯率後台管理區】
+if st.session_state.is_admin:
+    current_overrides = load_overrides()
+    new_overrides_global = current_overrides.copy()
+    global_needs_save = False
+    
+    # 篩選出原本有缺失資料的國家與對應欄位
+    missing_entries = []
+    for index, row in df_cached.iterrows():
+        code = row["國家代碼"]
+        name = row["國家"]
+        cols_missing = [col for col in ["指數點位", "單日指數漲跌幅 (%)", "年初指數至今報酬 (%)", "單日匯率漲跌幅 (%)", "市場波動率 (%)"] if pd.isna(row[col])]
+        if cols_missing:
+            missing_entries.append((code, name, cols_missing))
+            
+    if missing_entries:
+        st.warning("🛠️ **全球市場總覽後台管理區**：以下國家有部分指標無法讀取，請手動輸入補齊")
+        
+        # 依國家分組，用 Expander 收折避免畫面過長
+        for code, name, cols_missing in missing_entries:
+            with st.expander(f"📍 {name} ({code}) - 缺失 {len(cols_missing)} 項指標"):
+                # 動態產生該國家缺失欄位的輸入框
+                for col in cols_missing:
+                    override_key = f"{code}_{col}"
+                    prev_val = current_overrides.get(override_key, 0.0)
+                    
+                    input_val = st.number_input(
+                        f"{col}",
+                        value=float(prev_val),
+                        key=f"admin_global_{override_key}",
+                        format="%.2f"
+                    )
+                    new_overrides_global[override_key] = input_val
+                    global_needs_save = True
+                    
+        if global_needs_save:
+            if st.button("💾 儲存全球股市手動數據 (同步給所有訪客)"):
+                save_overrides(new_overrides_global)
+                st.success("已儲存全球股市數據！正在重新載入畫面...")
+                st.rerun()
+    else:
+        st.info("目前所有全球股市與匯率資料皆正常抓取，無需手動修正。")
+    st.markdown("---")
+
+# 正常渲染表格
 st.dataframe(display_df, hide_index=True, use_container_width=True)
-
-st.header(T["map_header"])
-color_scale = "RdYlGn" if metric_backend in ["單日指數漲跌幅 (%)", "年初指數至今報酬 (%)"] else "Blues"
-midpoint = 0 if metric_backend in ["單日指數漲跌幅 (%)", "年初指數至今報酬 (%)"] else None
-plot_metric = COL_EN[metric_backend] if language == "English" else metric_backend
-
-fig_map = px.choropleth(
-    display_df, locations="Country Code" if language == "English" else "國家代碼", 
-    color=plot_metric, hover_name="Country" if language == "English" else "國家",
-    projection="natural earth", color_continuous_scale=color_scale, color_continuous_midpoint=midpoint
-)
-fig_map.update_geos(fitbounds="locations", visible=False)
-fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
-st.plotly_chart(fig_map, use_container_width=True)
 
 # =========================================================
 # 🏢 房地產宏觀市場模塊 (Real Estate Module)
