@@ -198,11 +198,30 @@ COUNTRY_CONFIG = {
     "NZL": {"名稱": "紐西蘭", "洲": "大洋洲", "匯率": "NZD=X", "指數": "^NZ50", "新聞": "New Zealand economy", "en_name": "New Zealand"}
 }
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(ttl=86400)
 def translate_text(text, target_lang):
-    if not text: return text
-    try: return GoogleTranslator(source="auto", target=target_lang).translate(text)
-    except Exception: return text
+    if not text:
+        return text
+
+    if target_lang != "zh-TW":
+        return text
+
+    try:
+        translated = GoogleTranslator(
+            source="auto",
+            target="zh-TW"
+        ).translate(text)
+
+        if (
+            not translated
+            or any(x in str(translated) for x in ["Error", "500", "That’s all we know"])
+        ):
+            return text
+
+        return translated
+
+    except Exception:
+        return text
 
 # =========================================================
 # 📈 Yahoo Finance & Global Engine Data Fetching
