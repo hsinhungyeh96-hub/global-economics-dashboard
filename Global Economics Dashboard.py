@@ -772,6 +772,23 @@ if st.session_state.is_admin:
 st.dataframe(display_df, hide_index=True, use_container_width=True)
 
 # =========================================================
+# 🗺️ 渲染地圖
+# =========================================================
+st.header(T["map_header"])
+color_scale = "RdYlGn" if metric_backend in ["單日指數漲跌幅 (%)", "年初指數至今報酬 (%)"] else "Blues"
+midpoint = 0 if metric_backend in ["單日指數漲跌幅 (%)", "年初指數至今報酬 (%)"] else None
+plot_metric = COL_EN[metric_backend] if language == "English" else metric_backend
+
+fig_map = px.choropleth(
+    display_df, locations="Country Code" if language == "English" else "國家代碼", 
+    color=plot_metric, hover_name="Country" if language == "English" else "國家",
+    projection="natural earth", color_continuous_scale=color_scale, color_continuous_midpoint=midpoint
+)
+fig_map.update_geos(fitbounds="locations", visible=False)
+fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
+st.plotly_chart(fig_map, use_container_width=True)
+
+# =========================================================
 # 🏢 房地產宏觀市場模塊 (Real Estate Module)
 # =========================================================
 st.markdown("---")
