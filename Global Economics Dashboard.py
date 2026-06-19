@@ -13,6 +13,8 @@ import traceback
 from opencc import OpenCC
 import numpy as np
 from deep_translator import GoogleTranslator
+import os
+import copy
 
 # =========================================================
 # 🌐 UI Localization Dictionary
@@ -546,12 +548,43 @@ if language == "English":
     display_df["洲"] = display_df["洲"].map(CONTINENTS_EN)
     display_df["國家"] = display_df["國家代碼"].map(lambda c: COUNTRY_CONFIG[c]["en_name"])
     display_df.rename(columns=COL_EN, inplace=True)
+# =========================================================
+# 🛠️ 管理員後台機制 (Admin Backend)
+# =========================================================
+OVERRIDE_FILE = "manual_overrides.json"
 
+def load_overrides():
+    if os.path.exists(OVERRIDE_FILE):
+        try:
+            with open(OVERRIDE_FILE, "r") as f:
+                return json.load(f)
+        except: pass
+    return {}
+
+def save_overrides(data):
+    with open(OVERRIDE_FILE, "w") as f:
+        json.dump(data, f)
+
+# 初始化管理員狀態
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+
+# 在側邊欄最下方做一個低調的展開區塊當作後台入口
+with st.sidebar.expander("🛠️ Admin Login"):
+    pwd = st.text_input("Admin Password", type="password")
+    # 如果輸入的密碼符合 Secrets 裡的設定，就開啟管理員模式
+    if pwd == st.secrets.get("ADMIN_PASSWORD", "123456"):
+        st.session_state.is_admin = True
+        st.success("已切換至管理員模式")
+    elif pwd:
+        st.error("密碼錯誤")
 # =========================================================
 # 📈 Global Engine & KPIs
 # =========================================================
 st.subheader(T["engine_header"])
-global_data = fetch_global_metrics()
+global_data_cached = fetch_global_metrics()
+global_data = copy.deepcopy(global_data_cached) # 避免污染快取
+overrides = load_overrides()
 
 metric_order = ["恐慌指數 (VIX)", "黃金 (Gold)", "原油 (Crude Oil)", "10年期美債殖利率", "標普500 (S&P500)"]
 if language == "English":
@@ -559,13 +592,55 @@ if language == "English":
 else:
     display_metric_names = metric_order
 
+# 1. 替換 NaN 數據：如果原本抓不到(NaN)，且有手動存過的值，就替換上去
+for key in global_data:
+    if pd.isna(global_data[key].get("val")) and key in overrides:
+        global_data[key]["val"] = overrides[key]
+        global_data[key]["delta"] = 0.0
+        global_data[key]["z_score"] = 0.0
+
+# 2. 【管理員專屬介面】：如果登入了，顯示可以編輯的區域
+if st.session_state.is_admin:
+    st.markdown("---")
+    st.warning("🛠️ **後台管理區**：以下指標目前從 Yahoo Finance 抓不到資料，請手動輸入補齊")
+    new_overrides = overrides.copy()
+    admin_cols = st.columns(len(metric_order))
+    
+    needs_save = False
+    for i, backend_name in enumerate(metric_order):
+        # 只有真正抓不到的指標才顯示輸入框
+        if pd.isna(global_data_cached[backend_name].get("val")):
+            needs_save = True
+            with admin_cols[i]:
+                new_overrides[backend_name] = st.number_input(
+                    f"輸入 {backend_name}", 
+                    value=float(overrides.get(backend_name, 0.0)), 
+                    key=f"admin_{backend_name}"
+                )
+    
+    if needs_save:
+        if st.button("💾 儲存手動數據 (同步給所有訪客)"):
+            save_overrides(new_overrides)
+            st.success("已儲存！所有訪客現在都會看到這個數值。")
+            st.rerun()
+    else:
+        st.info("目前所有指標都能正常抓取，不需要手動輸入！")
+    st.markdown("---")
+
+# 3. 正常渲染給所有訪客看的 KPI 面板
 cols = st.columns(len(metric_order))
 for i, (backend_name, display_name) in enumerate(zip(metric_order, display_metric_names)):
     if backend_name in global_data:
         data = global_data[backend_name]
         val, delta = data.get("val"), data.get("delta", 0.0)
-        val_str = f"{val:.2f}" if val and not np.isnan(val) else "N/A"
-        delta_str = f"{delta:.2f}%" if delta is not None else "0.00%"
+        
+        # 如果經過剛剛的替換還是 NaN (代表你還沒手動填過)，顯示 N/A
+        if pd.isna(val) or val is None:
+            val_str, delta_str = "N/A", "0.00%"
+        else:
+            val_str = f"{val:.2f}"
+            delta_str = f"{delta:.2f}%" if delta is not None else "0.00%"
+            
         with cols[i]:
             st.metric(label=display_name, value=val_str, delta=delta_str)
 
