@@ -98,7 +98,46 @@ CONTINENTS_EN = {
     "北美": "North America", "歐洲": "Europe", "亞洲": "Asia", 
     "南美": "South America", "非洲": "Africa", "中東": "Middle East", "大洋洲": "Oceania"
 }
+# =========================================================
+# 🛠️ 管理員後台機制 (Admin Backend)
+# =========================================================
+OVERRIDE_FILE = "manual_overrides.json"
 
+def load_overrides():
+    if os.path.exists(OVERRIDE_FILE):
+        try:
+            with open(OVERRIDE_FILE, "r") as f:
+                return json.load(f)
+        except: pass
+    return {}
+
+def save_overrides(data):
+    with open(OVERRIDE_FILE, "w") as f:
+        json.dump(data, f)
+
+# 初始化管理員狀態
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+
+# 在側邊欄最下方做一個低調的展開區塊當作後台入口
+with st.sidebar.expander("🛠️ Admin Panel"):
+    # 如果還沒登入，顯示密碼輸入框
+    if not st.session_state.is_admin:
+        pwd = st.text_input("Admin Password", type="password")
+        # 如果輸入的密碼符合 Secrets 裡的設定，就開啟管理員模式
+        if pwd == st.secrets.get("ADMIN_PASSWORD", "123456"):
+            st.session_state.is_admin = True
+            st.success("✅ 登入成功！已切換至管理員模式。")
+            st.rerun()  # 立即刷新畫面以顯示管理員介面
+        elif pwd:
+            st.error("❌ 密碼錯誤")
+            
+    # 如果已經登入，顯示當前狀態與登出按鈕
+    else:
+        st.success("🧑‍💻 目前身分：管理員")
+        if st.button("🚪 登出", use_container_width=True):
+            st.session_state.is_admin = False
+            st.rerun()  # 立即刷新畫面以隱藏管理員介面
 # =========================================================
 # 🌍 基礎設定與國家設定
 # =========================================================
@@ -559,46 +598,7 @@ if language == "English":
     display_df["洲"] = display_df["洲"].map(CONTINENTS_EN)
     display_df["國家"] = display_df["國家代碼"].map(lambda c: COUNTRY_CONFIG[c]["en_name"])
     display_df.rename(columns=COL_EN, inplace=True)
-# =========================================================
-# 🛠️ 管理員後台機制 (Admin Backend)
-# =========================================================
-OVERRIDE_FILE = "manual_overrides.json"
 
-def load_overrides():
-    if os.path.exists(OVERRIDE_FILE):
-        try:
-            with open(OVERRIDE_FILE, "r") as f:
-                return json.load(f)
-        except: pass
-    return {}
-
-def save_overrides(data):
-    with open(OVERRIDE_FILE, "w") as f:
-        json.dump(data, f)
-
-# 初始化管理員狀態
-if "is_admin" not in st.session_state:
-    st.session_state.is_admin = False
-
-# 在側邊欄最下方做一個低調的展開區塊當作後台入口
-with st.sidebar.expander("🛠️ Admin Panel"):
-    # 如果還沒登入，顯示密碼輸入框
-    if not st.session_state.is_admin:
-        pwd = st.text_input("Admin Password", type="password")
-        # 如果輸入的密碼符合 Secrets 裡的設定，就開啟管理員模式
-        if pwd == st.secrets.get("ADMIN_PASSWORD", "123456"):
-            st.session_state.is_admin = True
-            st.success("✅ 登入成功！已切換至管理員模式。")
-            st.rerun()  # 立即刷新畫面以顯示管理員介面
-        elif pwd:
-            st.error("❌ 密碼錯誤")
-            
-    # 如果已經登入，顯示當前狀態與登出按鈕
-    else:
-        st.success("🧑‍💻 目前身分：管理員")
-        if st.button("🚪 登出", use_container_width=True):
-            st.session_state.is_admin = False
-            st.rerun()  # 立即刷新畫面以隱藏管理員介面
 # =========================================================
 # 📈 Global Engine & KPIs
 # =========================================================
