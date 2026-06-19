@@ -724,12 +724,7 @@ st.plotly_chart(fig_map, use_container_width=True)
 st.markdown("---")
 st.header(T["re_header"])
 
-# 抓取原始房地產數據與圖表資料
-re_chart_df, re_metrics_cached = fetch_real_estate_data()
-
-# 1. 建立深度拷貝，並讀取手動設定檔
-re_metrics = copy.deepcopy(re_metrics_cached)
-overrides = load_overrides()
+re_chart_df, re_metrics = fetch_real_estate_data()
 
 # 💡 定義房地產資產的英文字典（供圖表與 Metric 共同使用）
 re_name_map_en = {
@@ -740,129 +735,111 @@ re_name_map_en = {
     "10年期美債殖利率": "10Y Treasury Yield"
 }
 
-# 2. 替換缺失數據：若 API 沒抓到該指標（不在字典裡），就用 overrides 填補
-for zh_name in REAL_ESTATE_CONFIG.keys():
-    if zh_name not in re_metrics:
-        if zh_name in overrides:
-            saved_item = overrides[zh_name]
-            if isinstance(saved_item, dict):
-                re_metrics[zh_name] = {
-                    "price": saved_item.get("val", 0.0),
-                    "daily_pct": saved_item.get("delta", 0.0)
-                }
-            else:
-                re_metrics[zh_name] = {"price": float(saved_item), "daily_pct": 0.0}
-
-# 3. 【管理員專屬介面】：若登入管理員，且有房地產指標缺失，顯示輸入框
-if st.session_state.is_admin:
-    new_overrides = overrides.copy()
-    needs_save_re = False
+if re_metrics:
+    st.subheader(T["re_metrics"])
+    # 動態產生 Metric Columns
+    re_cols = st.columns(len(REAL_ESTATE_CONFIG))
     
-    # 篩選出真的沒抓到資料的指標
-    missing_re_metrics = [name for name in REAL_ESTATE_CONFIG.keys() if name not in re_metrics_cached]
-    
-    if missing_re_metrics:
-        st.warning("🛠️ **後台管理區 (房地產)**：以下指標目前抓不到資料，請手動輸入補齊")
-        
-        for zh_name in missing_re_metrics:
-            needs_save_re = True
-            st.markdown(f"#### 📍 {zh_name}")
-            re_admin_cols = st.columns(2)
-            
-            prev_item = overrides.get(zh_name, {"val": 0.0, "delta": 0.0})
-            if not isinstance(prev_item, dict):
-                prev_item = {"val": float(prev_item), "delta": 0.0}
-                
-            # 注意這裡的 key 有加 "re_" 前綴，避免跟上方的全域指標衝突
-            with re_admin_cols[0]:
-                input_val = st.number_input(
-                    f"數值/點位", 
-                    value=float(prev_item.get("val", 0.0)), 
-                    key=f"admin_re_val_{zh_name}"
-                )
-            with re_admin_cols[1]:
-                input_delta = st.number_input(
-                    f"漲跌幅 (%)", 
-                    value=float(prev_item.get("delta", 0.0)), 
-                    key=f"admin_re_delta_{zh_name}",
-                    format="%.2f"
-                )
-            
-            new_overrides[zh_name] = {"val": input_val, "delta": input_delta}
-    
-        if needs_save_re:
-            if st.button("💾 儲存房地產手動數據", key="save_re_btn"):
-                save_overrides(new_overrides)
-                st.success("已儲存！房地產數據已同步給所有訪客。")
-                st.rerun()
-        st.markdown("---")
-
-# 4. 正常渲染 Metric 畫面
-st.subheader(T["re_metrics"])
-
-# 確保不管 yfinance 有沒有爆掉，所有指標欄位一定會被對齊畫出來
-re_cols = st.columns(len(REAL_ESTATE_CONFIG))
-
-for i, zh_name in enumerate(REAL_ESTATE_CONFIG.keys()):
-    display_name = re_name_map_en.get(zh_name, zh_name) if language == "English" else zh_name
-    with re_cols[i]:
-        if zh_name in re_metrics:
-            data = re_metrics[zh_name]
+    for i, (zh_name, data) in enumerate(re_metrics.items()):
+        display_name = re_name_map_en.get(zh_name, zh_name) if language == "English" else zh_name
+        with re_cols[i]:
             val_str = f"{data['price']:.2f}"
             delta_str = f"{data['daily_pct']:.2f}%"
-            
-            # 10年期美債顯示格式微調
+            # 10年期美債的單位是%，顯示上稍作區分
             if "TNX" in REAL_ESTATE_CONFIG[zh_name]:
                 val_str = f"{data['price']:.3f}%"
-                delta_str = f"{data['daily_pct']:.2f} bps"
+                delta_str = f"{data['daily_pct']:.2f} bps" # 近似基點變動
                 
             st.metric(label=display_name, value=val_str, delta=delta_str)
-        else:
-            st.metric(label=display_name, value="N/A", delta="0.00%")
 
-# 5. 渲染房地產走勢折線圖
 if not re_chart_df.empty:
     st.subheader(T["re_chart"])
+    # 融化 DataFrame 以適應 Plotly 格式
+    df_melted = re_chart_df.melt(id_vars=["Date"], var_name="Asset", value_name="Normalized Performance (Base=100)")
     
-    # 複製一份 DataFrame 避免污染原始歷史數據
-    chart_data = re_chart_df.copy()
-    
-    # 🔧 關鍵修復：強制將所有資料轉換為數值格式 (Float)，遇到無法轉換的變成 NaN，統一資料格式！
-    chart_data = chart_data.apply(pd.to_numeric, errors='coerce')
-    
-    # 如果使用者切換為英文，將圖表內的欄位名稱（Legends）自動翻譯
     if language == "English":
-        chart_data = chart_data.rename(columns=re_name_map_en)
-    
-    import plotly.express as px
-    
-    # 建立 Plotly 折線圖
-    fig = px.line(
-        chart_data,
-        x=chart_data.index,
-        y=chart_data.columns,
-        labels={"value": "Price / Yield", "Date": "Date", "variable": "Asset"},
-        template="plotly_white"
+        df_melted["Asset"] = df_melted["Asset"].map(lambda x: re_name_map_en.get(x, x))
+        
+    # 📌 移除潛在報錯風險的 hover_data 自訂語法，改用乾淨流暢的預設 px.line
+    fig_re = px.line(
+        df_melted, x="Date", y="Normalized Performance (Base=100)", color="Asset"
     )
     
-    # 美化圖表外觀與圖例位置
-    fig.update_layout(
+    fig_re.update_layout(
         hovermode="x unified",
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
-        margin=dict(l=20, r=20, t=50, b=20),
-        xaxis_title=None,
-        yaxis_title=None
+        legend_title_text="資產標的" if language == "繁體中文" else "Assets",
+        margin={"r": 0, "t": 20, "l": 0, "b": 0}, 
+        height=400
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    # 📌 透過 update_xaxes 確保 X 軸時間顯示格式漂亮且客製化
+    fig_re.update_xaxes(tickformat="%Y-%m-%d")
+    st.plotly_chart(fig_re, use_container_width=True)
 
-st.markdown("---")
+
+# --- 🛡️ 核心防錯：獨立出獲取殖利率的快取函數，ttl 設定 1 小時 ---
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_yield_spread_data(vnq_ticker="VNQ", treasury_ticker="^TNX"):
+    try:
+        vnq = yf.Ticker(vnq_ticker)
+        tnx = yf.Ticker(treasury_ticker)
+        
+        # 透過快取隔離 info 呼叫，徹底封鎖 YFRateLimitError
+        info = vnq.info
+        raw_yield = info.get('dividendYield', 0.04) 
+        if raw_yield > 1: 
+            raw_yield = raw_yield / 100 
+        
+        vnq_yield = raw_yield * 100
+        
+        # 獲取美債最新收盤價
+        tnx_hist = tnx.history(period="5d")
+        tnx_yield = tnx_hist['Close'].iloc[-1] if not tnx_hist.empty else 4.0
+        
+        return vnq_yield, tnx_yield
+    except Exception as e:
+        print(f"Fetch Yield Spread Error: {e}")
+        # 如果 yfinance 暫時抽風，提供一組合理的市場預設值防崩潰
+        return 4.2, 4.3 
+
+
+def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
+    # 設定標題語系
+    if current_lang == "English":
+        title = "🔍 US Real Estate Risk Premium"
+        label1, label2, label3 = "REITs Yield (VNQ)", "Risk-Free Rate (10Y)", "Risk Premium (Spread)"
+        msg_err = "⚠️ Warning: REITs yield is lower than the risk-free rate! This often signals overvaluation or extreme bond market sell-off."
+        msg_warn = "⚖️ Observation: Risk premium is tightening. REITs attractiveness is waning; proceed with caution."
+        msg_succ = "✅ Healthy: Real Estate still offers a reasonable risk premium. Attractive for allocation."
+    else:
+        title = "🔍 美國房地產風險溢價分析"
+        label1, label2, label3 = "房地產收益率 (VNQ)", "無風險利率 (10Y)", "風險溢價 (Spread)"
+        msg_err = "⚠️ 警示：房地產殖利率低於無風險利率！這通常代表房地產資產估值過高或債市出現極端拋售。"
+        msg_warn = "⚖️ 觀察：風險溢價收窄。房地產的吸引力正在減弱，建議謹慎配置。"
+        msg_succ = "✅ 健康：房地產仍具備合理的風險溢價，資金配置具備吸引力。"
+
+    st.markdown(f"### {title}")
+    
+    # 🚀 從剛剛定義的快取函數撈數據，安全、乾淨、不踩雷
+    vnq_yield, tnx_yield = fetch_yield_spread_data(vnq_ticker, treasury_ticker)
+    spread = vnq_yield - tnx_yield
+    
+    # 顯示指標
+    col1, col2, col3 = st.columns(3)
+    col1.metric(label1, f"{vnq_yield:.2f}%")
+    col2.metric(label2, f"{tnx_yield:.2f}%")
+    col3.metric(label3, f"{spread:.2f}%")
+    
+    # 顯示評論
+    if spread < 0:
+        st.error(msg_err)
+    elif spread < 1.0:
+        st.warning(msg_warn)
+    else:
+        st.success(msg_succ)
+
+# 最後在主程式區塊呼叫
+render_yield_spread(language)
 
 # =========================================================
 # 📰 房地產各大洲專屬 AI 新聞總結
