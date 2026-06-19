@@ -592,36 +592,63 @@ if language == "English":
 else:
     display_metric_names = metric_order
 
-# 1. 替換 NaN 數據：如果原本抓不到(NaN)，且有手動存過的值，就替換上去
+# 1. 替換 NaN 數據：如果原本抓不到(NaN)，且有手動存過的值，就替換上去（同時覆蓋 val 與 delta）
 for key in global_data:
     if pd.isna(global_data[key].get("val")) and key in overrides:
-        global_data[key]["val"] = overrides[key]
-        global_data[key]["delta"] = 0.0
-        global_data[key]["z_score"] = 0.0
+        saved_item = overrides[key]
+        # 檢查是否為新格式 {"val": ..., "delta": ...}
+        if isinstance(saved_item, dict):
+            global_data[key]["val"] = saved_item.get("val", 0.0)
+            global_data[key]["delta"] = saved_item.get("delta", 0.0)
+        else:
+            # 相容舊格式（如果之前只存了單一數字）
+            global_data[key]["val"] = saved_item
+            global_data[key]["delta"] = 0.0
+        
+        global_data[key]["z_score"] = 0.0 # 缺失歷史資料，z_score 預設為 0
 
 # 2. 【管理員專屬介面】：如果登入了，顯示可以編輯的區域
 if st.session_state.is_admin:
     st.markdown("---")
     st.warning("🛠️ **後台管理區**：以下指標目前從 Yahoo Finance 抓不到資料，請手動輸入補齊")
     new_overrides = overrides.copy()
-    admin_cols = st.columns(len(metric_order))
     
     needs_save = False
-    for i, backend_name in enumerate(metric_order):
+    for backend_name in metric_order:
         # 只有真正抓不到的指標才顯示輸入框
         if pd.isna(global_data_cached[backend_name].get("val")):
             needs_save = True
-            with admin_cols[i]:
-                new_overrides[backend_name] = st.number_input(
-                    f"輸入 {backend_name}", 
-                    value=float(overrides.get(backend_name, 0.0)), 
-                    key=f"admin_{backend_name}"
+            st.markdown(f"#### 📍 {backend_name}")
+            
+            # 使用 side-by-side 欄位同時輸入點位與漲跌幅
+            admin_cols = st.columns(2)
+            
+            # 讀取歷史紀錄（相容新舊格式）
+            prev_item = overrides.get(backend_name, {"val": 0.0, "delta": 0.0})
+            if not isinstance(prev_item, dict):
+                prev_item = {"val": float(prev_item), "delta": 0.0}
+                
+            with admin_cols[0]:
+                input_val = st.number_input(
+                    f"數值/點位", 
+                    value=float(prev_item.get("val", 0.0)), 
+                    key=f"admin_val_{backend_name}"
                 )
+            with admin_cols[1]:
+                input_delta = st.number_input(
+                    f"漲跌幅 (%)", 
+                    value=float(prev_item.get("delta", 0.0)), 
+                    key=f"admin_delta_{backend_name}",
+                    format="%.2f"
+                )
+            
+            # 整合進新的儲存結構
+            new_overrides[backend_name] = {"val": input_val, "delta": input_delta}
     
     if needs_save:
         if st.button("💾 儲存手動數據 (同步給所有訪客)"):
             save_overrides(new_overrides)
-            st.success("已儲存！所有訪客現在都會看到這個數值。")
+            st.success("已儲存！所有訪客現在都會看到最新的點位與漲跌幅。")
             st.rerun()
     else:
         st.info("目前所有指標都能正常抓取，不需要手動輸入！")
