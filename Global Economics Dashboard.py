@@ -827,6 +827,9 @@ if not re_chart_df.empty:
     # 複製一份 DataFrame 避免污染原始歷史數據
     chart_data = re_chart_df.copy()
     
+    # 🔧 關鍵修復：強制將所有資料轉換為數值格式 (Float)，遇到無法轉換的變成 NaN，統一資料格式！
+    chart_data = chart_data.apply(pd.to_numeric, errors='coerce')
+    
     # 如果使用者切換為英文，將圖表內的欄位名稱（Legends）自動翻譯
     if language == "English":
         chart_data = chart_data.rename(columns=re_name_map_en)
