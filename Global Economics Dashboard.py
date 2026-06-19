@@ -1004,154 +1004,288 @@ render_yield_spread(language)
 # =========================================================
 st.subheader(T["re_news"])
 
-# 1. 獨立出 AI 總結函數，並設定 ttl=86400 (24小時)，確保一天只消耗一次 Token！
+# =========================================================
+# AI Summary (Cache 24hr)
+# =========================================================
 @st.cache_data(ttl=86400)
 def fetch_re_ai_summary(continent_name, news_titles_tuple, today_str, lang_instruction):
+
     re_prompt = f"""
-    Today is {today_str}.
-    Based on the following {continent_name} real estate headlines, analyze the macro real estate market condition for this region.
-    {lang_instruction}
-    Return a valid JSON object only. Do not use markdown.
-    Required format:
-    {{
-        "market_focus":"One sentence real estate market focus",
-        "stock_outlook":"REITs and housing market analysis",
-        "currency_outlook":"Impact of interest rates/yields on real estate",
-        "risk_tip":"Real estate risk warning"
-    }}
-    Headlines:
-    {chr(10).join(news_titles_tuple)}
-    """
+Today is {today_str}.
+
+Based on the following {continent_name} real estate headlines:
+
+1. Identify the dominant regional real estate trend.
+2. Summarize the macro property market.
+3. Analyze REITs, commercial property and housing market implications.
+4. Explain the impact of interest rates and bond yields.
+5. If today's headlines are concentrated in one country, still provide a regional perspective instead of focusing only on that country.
+
+{lang_instruction}
+
+Return a valid JSON object only.
+
+Required format:
+
+{{
+    "market_focus":"One sentence real estate market focus",
+    "stock_outlook":"REITs and housing market analysis",
+    "currency_outlook":"Impact of interest rates/yields on real estate",
+    "risk_tip":"Real estate risk warning"
+}}
+
+Headlines:
+
+{chr(10).join(news_titles_tuple)}
+"""
+
     try:
         re_response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "You are a professional real estate macro analyst. Return valid JSON only."},
-                {"role": "user", "content": re_prompt},
+                {
+                    "role": "system",
+                    "content": "You are a professional global real estate macro analyst. Return valid JSON only."
+                },
+                {
+                    "role": "user",
+                    "content": re_prompt
+                },
             ],
             stream=False,
         )
+
         re_content = re_response.choices[0].message.content.strip()
+
         match = re.search(r"\{.*\}", re_content, re.DOTALL)
+
         if match:
             return json.loads(match.group())
+
     except Exception as e:
         print(f"AI 解析錯誤 ({continent_name}): {e}")
+
     return None
 
-# 2. 定義各大洲房地產新聞搜尋關鍵字
+
+# =========================================================
+# 房地產新聞搜尋關鍵字
+# =========================================================
+
 RE_CONTINENT_KEYWORDS = {
+
     "北美": """
     US OR United States OR Canada OR Mexico
-    real estate OR property OR housing OR REIT
-    OR commercial real estate OR office market OR mortgage
+    real estate OR property OR housing
+    OR commercial property OR office market OR mortgage OR REIT
     """,
 
     "歐洲": """
     Germany OR UK OR France OR Spain OR Italy
     OR Netherlands OR Sweden OR Poland OR Portugal
     real estate OR property OR housing
-    OR REIT OR commercial property OR office market
+    OR commercial property OR office market OR REIT
     """,
 
     "亞洲": """
-    Japan OR Tokyo OR J-REIT
-    OR Japan housing OR Japan property
-    OR China property
+    Japan property
+    OR Tokyo office
+    OR J-REIT
+    OR China property market
     OR Singapore real estate
     OR South Korea housing
     OR India property
     OR Taiwan housing
     OR Hong Kong property
-    OR commercial real estate
-    OR REIT
     """,
 
     "南美": """
     Brazil OR Argentina OR Chile OR Colombia
     real estate OR property OR housing
-    OR commercial real estate
+    OR commercial property
     """,
 
     "中東及非洲": """
     UAE OR Dubai OR Saudi Arabia OR Qatar
     OR Egypt OR South Africa OR Kenya
     real estate OR property
-    OR commercial real estate
+    OR commercial property
     """,
 
     "大洋洲": """
     Australia OR Sydney OR Melbourne
     OR New Zealand
     real estate OR property OR housing
-    OR REIT OR commercial property
+    OR commercial property OR REIT
     """
 }
 
+
+# =========================================================
+# Tabs
+# =========================================================
+
 if language == "English":
-    re_tab_names = ["North America", "Europe", "Asia", "South America", "Middle East & Africa", "Oceania"]
+    re_tab_names = [
+        "North America",
+        "Europe",
+        "Asia",
+        "South America",
+        "Middle East & Africa",
+        "Oceania",
+    ]
 else:
     re_tab_names = list(RE_CONTINENT_KEYWORDS.keys())
 
 re_tabs = st.tabs(re_tab_names)
 
-# 3. 執行迴圈與渲染畫面
+
+# =========================================================
+# Render
+# =========================================================
+
 for tab, (zh_continent, keyword) in zip(re_tabs, RE_CONTINENT_KEYWORDS.items()):
+
     with tab:
+
         re_news_items = get_news(keyword)
-        
+
         if re_news_items:
+
             today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+
             with st.spinner(T["analyzing"]):
-                # 將 List 轉為 Tuple，因為 Streamlit 的 cache 函數參數必須是可雜湊的 (hashable)
-                re_news_titles = tuple([item["title"] for item in re_news_items[:8]])
-                lang_instruction = "請務必使用繁體中文。" if language == "繁體中文" else "Please output entirely in English."
-                continent_name = zh_continent if language == "繁體中文" else re_tab_names[list(RE_CONTINENT_KEYWORDS.keys()).index(zh_continent)]
-                
-                # 呼叫快取函數 (這裡才會真正省 Token！)
-                re_data = fetch_re_ai_summary(continent_name, re_news_titles, today_str, lang_instruction)
-                
+
+                # -----------------------------
+                # 去除重複新聞標題
+                # -----------------------------
+                seen = set()
+                unique_titles = []
+
+                for item in re_news_items:
+
+                    title = item["title"]
+
+                    if title not in seen:
+                        seen.add(title)
+                        unique_titles.append(title)
+
+                # AI 最多閱讀 8 則不同新聞
+                re_news_titles = tuple(unique_titles[:8])
+
+                lang_instruction = (
+                    "請務必使用繁體中文。"
+                    if language == "繁體中文"
+                    else "Please output entirely in English."
+                )
+
+                continent_name = (
+                    zh_continent
+                    if language == "繁體中文"
+                    else re_tab_names[
+                        list(RE_CONTINENT_KEYWORDS.keys()).index(zh_continent)
+                    ]
+                )
+
+                re_data = fetch_re_ai_summary(
+                    continent_name,
+                    re_news_titles,
+                    today_str,
+                    lang_instruction,
+                )
+
                 if re_data:
-                    # 繁體中文轉換
+
                     if language == "繁體中文":
                         for k, v in re_data.items():
                             if isinstance(v, str):
                                 re_data[k] = cc.convert(v)
-                    
+
                     with st.container(border=True):
-                        # 📌 修正：根據使用者選擇的語言，動態決定小標題的文字
+
                         if language == "English":
-                            focus_label = "Focus: "
-                            col1_header = f"**🏢 {continent_name} Real Estate & REITs Outlook**"
-                            col2_header = "**📉 Interest Rate Environment & Impact**"
+
+                            focus_label = "Focus"
+
+                            col1_header = (
+                                f"**🏢 {continent_name} Real Estate & REITs Outlook**"
+                            )
+
+                            col2_header = (
+                                "**📉 Interest Rate Environment & Impact**"
+                            )
+
                         else:
-                            focus_label = f"{T['focus']}："
-                            col1_header = f"**🏢 {continent_name}房市與 REITs 展望**"
-                            col2_header = "**📉 利率環境與影響**"
+
+                            focus_label = T["focus"]
+
+                            col1_header = (
+                                f"**🏢 {continent_name}房市與 REITs 展望**"
+                            )
+
+                            col2_header = (
+                                "**📉 利率環境與影響**"
+                            )
 
                         st.write(f"📅 {today_str}")
-                        st.write(f"**{focus_label}**{re_data.get('market_focus', '')}")
-                        
+
+                        st.write(
+                            f"**{focus_label}：** {re_data.get('market_focus','')}"
+                        )
+
                         col1, col2 = st.columns(2)
+
                         with col1:
+
                             st.markdown(col1_header)
-                            st.info(re_data.get("stock_outlook", ""))
+
+                            st.info(
+                                re_data.get("stock_outlook", "")
+                            )
+
                         with col2:
+
                             st.markdown(col2_header)
-                            st.info(re_data.get("currency_outlook", ""))
-                            
+
+                            st.info(
+                                re_data.get("currency_outlook", "")
+                            )
+
                         st.markdown(f"**{T['risk']}**")
-                        st.warning(re_data.get("risk_tip", ""))
+
+                        st.warning(
+                            re_data.get("risk_tip", "")
+                        )
+
                 else:
+
                     st.error(T["ai_error"])
-                    
-            # 顯示原始新聞連結
-            expander_title = "閱讀最新新聞" if language == "繁體中文" else f"Read Latest {continent_name} News"
+
+            # -----------------------------
+            # 原始新聞
+            # -----------------------------
+            expander_title = (
+                "閱讀最新新聞"
+                if language == "繁體中文"
+                else f"Read Latest {continent_name} News"
+            )
+
             with st.expander(expander_title):
+
                 for item in re_news_items:
-                    title_text = translate_text(item['title'], "zh-TW") if language == "繁體中文" else item['title']
-                    st.markdown(f"- **[{title_text}]({item['link']})** ({item['date']})")
+
+                    title_text = (
+                        translate_text(item["title"], "zh-TW")
+                        if language == "繁體中文"
+                        else item["title"]
+                    )
+
+                    st.markdown(
+                        f"- **[{title_text}]({item['link']})** ({item['date']})"
+                    )
+
         else:
+
             st.warning(T["no_news"])
 # =========================================================
 # 📰 Financial News & AI Cache System
