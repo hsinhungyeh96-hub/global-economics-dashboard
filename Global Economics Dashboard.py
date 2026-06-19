@@ -1042,36 +1042,49 @@ def fetch_re_ai_summary(continent_name, news_titles_tuple, today_str, lang_instr
 # 2. 定義各大洲房地產新聞搜尋關鍵字
 RE_CONTINENT_KEYWORDS = {
     "北美": """
-    US OR Canada OR Mexico
-    real estate OR housing OR property OR REIT
+    US OR United States OR Canada OR Mexico
+    real estate OR property OR housing OR REIT
+    OR commercial real estate OR office market OR mortgage
     """,
 
     "歐洲": """
-    UK OR Germany OR France OR Spain OR Italy OR Netherlands
-    OR Sweden OR Poland OR Portugal
-    real estate OR housing OR property market OR REIT
+    Germany OR UK OR France OR Spain OR Italy
+    OR Netherlands OR Sweden OR Poland OR Portugal
+    real estate OR property OR housing
+    OR REIT OR commercial property OR office market
     """,
 
     "亞洲": """
-    China OR Japan OR South Korea OR Singapore
-    OR India OR Taiwan OR Hong Kong
-    real estate OR housing OR property market
+    Japan OR Tokyo OR J-REIT
+    OR Japan housing OR Japan property
+    OR China property
+    OR Singapore real estate
+    OR South Korea housing
+    OR India property
+    OR Taiwan housing
+    OR Hong Kong property
+    OR commercial real estate
+    OR REIT
     """,
 
     "南美": """
     Brazil OR Argentina OR Chile OR Colombia
-    real estate OR housing OR property market
+    real estate OR property OR housing
+    OR commercial real estate
     """,
 
     "中東及非洲": """
-    UAE OR Saudi Arabia OR Qatar OR Egypt
-    OR South Africa OR Kenya
-    real estate OR property market
+    UAE OR Dubai OR Saudi Arabia OR Qatar
+    OR Egypt OR South Africa OR Kenya
+    real estate OR property
+    OR commercial real estate
     """,
 
     "大洋洲": """
-    Australia OR New Zealand
-    real estate OR housing market
+    Australia OR Sydney OR Melbourne
+    OR New Zealand
+    real estate OR property OR housing
+    OR REIT OR commercial property
     """
 }
 
@@ -1091,7 +1104,7 @@ for tab, (zh_continent, keyword) in zip(re_tabs, RE_CONTINENT_KEYWORDS.items()):
             today_str = datetime.datetime.now().strftime("%Y-%m-%d")
             with st.spinner(T["analyzing"]):
                 # 將 List 轉為 Tuple，因為 Streamlit 的 cache 函數參數必須是可雜湊的 (hashable)
-                re_news_titles = tuple([item["title"] for item in re_news_items[:5]])
+                re_news_titles = tuple([item["title"] for item in re_news_items[:8]])
                 lang_instruction = "請務必使用繁體中文。" if language == "繁體中文" else "Please output entirely in English."
                 continent_name = zh_continent if language == "繁體中文" else re_tab_names[list(RE_CONTINENT_KEYWORDS.keys()).index(zh_continent)]
                 
