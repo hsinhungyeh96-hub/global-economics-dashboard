@@ -821,12 +821,6 @@ for i, zh_name in enumerate(REAL_ESTATE_CONFIG.keys()):
                 
         st.metric(label=display_name, value=val_str, delta=delta_str)
 
-
-if not re_chart_df.empty:
-    st.subheader(T["re_chart"])
-    # 融化 DataFrame 以適應 Plotly 格式
-    # ... (保留你原有的圖表渲染邏輯)
-
 if not re_chart_df.empty:
     st.subheader(T["re_chart"])
     # 融化 DataFrame 以適應 Plotly 格式
