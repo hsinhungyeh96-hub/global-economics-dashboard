@@ -724,7 +724,8 @@ st.plotly_chart(fig_map, use_container_width=True)
 st.markdown("---")
 st.header(T["re_header"])
 
-re_chart_df, re_metrics = fetch_real_estate_data()
+re_chart_df, re_metrics_cached = fetch_real_estate_data()
+re_metrics = copy.deepcopy(re_metrics_cached) # 避免污染快取
 
 # 💡 定義房地產資產的英文字典（供圖表與 Metric 共同使用）
 re_name_map_en = {
@@ -735,22 +736,96 @@ re_name_map_en = {
     "10年期美債殖利率": "10Y Treasury Yield"
 }
 
-if re_metrics:
-    st.subheader(T["re_metrics"])
-    # 動態產生 Metric Columns
-    re_cols = st.columns(len(REAL_ESTATE_CONFIG))
+st.subheader(T["re_metrics"])
+
+# 1. 確保所有指標都在字典中，若因抓不到導致缺失，則補上 NaN
+for zh_name in REAL_ESTATE_CONFIG.keys():
+    if zh_name not in re_metrics:
+        re_metrics[zh_name] = {"price": np.nan, "daily_pct": np.nan}
+        
+    # 如果是 NaN 且之前有手動存過的值，就進行替換
+    if pd.isna(re_metrics[zh_name].get("price")) and zh_name in overrides:
+        saved_item = overrides[zh_name]
+        if isinstance(saved_item, dict):
+            re_metrics[zh_name]["price"] = saved_item.get("val", 0.0)
+            re_metrics[zh_name]["daily_pct"] = saved_item.get("delta", 0.0)
+        else:
+            re_metrics[zh_name]["price"] = saved_item
+            re_metrics[zh_name]["daily_pct"] = 0.0
+
+# 2. 【管理員專屬介面】：房地產指標手動輸入區
+if st.session_state.is_admin:
+    st.markdown("---")
+    st.warning("🛠️ **房地產後台管理區**：以下指標目前從 Yahoo Finance 抓不到資料，請手動輸入補齊")
+    new_overrides_re = overrides.copy()
     
-    for i, (zh_name, data) in enumerate(re_metrics.items()):
-        display_name = re_name_map_en.get(zh_name, zh_name) if language == "English" else zh_name
-        with re_cols[i]:
-            val_str = f"{data['price']:.2f}"
-            delta_str = f"{data['daily_pct']:.2f}%"
-            # 10年期美債的單位是%，顯示上稍作區分
-            if "TNX" in REAL_ESTATE_CONFIG[zh_name]:
-                val_str = f"{data['price']:.3f}%"
-                delta_str = f"{data['daily_pct']:.2f} bps" # 近似基點變動
+    re_needs_save = False
+    for zh_name in REAL_ESTATE_CONFIG.keys():
+        if pd.isna(re_metrics[zh_name].get("price")):
+            re_needs_save = True
+            st.markdown(f"#### 📍 {zh_name}")
+            
+            admin_cols_re = st.columns(2)
+            prev_item = overrides.get(zh_name, {"val": 0.0, "delta": 0.0})
+            if not isinstance(prev_item, dict):
+                prev_item = {"val": float(prev_item), "delta": 0.0}
                 
-            st.metric(label=display_name, value=val_str, delta=delta_str)
+            with admin_cols_re[0]:
+                input_val = st.number_input(
+                    f"數值/點位 ({zh_name})", 
+                    value=float(prev_item.get("val", 0.0)), 
+                    key=f"admin_re_val_{zh_name}"
+                )
+            with admin_cols_re[1]:
+                input_delta = st.number_input(
+                    f"漲跌幅 (%) ({zh_name})", 
+                    value=float(prev_item.get("delta", 0.0)), 
+                    key=f"admin_re_delta_{zh_name}",
+                    format="%.2f"
+                )
+            
+            # 存入跟上面全球指標相同的資料結構 (val / delta)
+            new_overrides_re[zh_name] = {"val": input_val, "delta": input_delta}
+    
+    if re_needs_save:
+        if st.button("💾 儲存房地產手動數據 (同步給所有訪客)"):
+            save_overrides(new_overrides_re)
+            st.success("已儲存！所有訪客現在都會看到最新的房地產點位與漲跌幅。")
+            st.rerun()
+    else:
+        st.info("目前所有房地產指標都能正常抓取，不需要手動輸入！")
+    st.markdown("---")
+
+# 3. 渲染 Metric 面板
+re_cols = st.columns(len(REAL_ESTATE_CONFIG))
+
+for i, zh_name in enumerate(REAL_ESTATE_CONFIG.keys()):
+    data = re_metrics[zh_name]
+    display_name = re_name_map_en.get(zh_name, zh_name) if language == "English" else zh_name
+    
+    with re_cols[i]:
+        price_val = data.get('price')
+        pct_val = data.get('daily_pct', 0.0)
+        
+        # 若最後還是 NaN（還沒手動填過），顯示 N/A
+        if pd.isna(price_val) or price_val is None:
+            val_str, delta_str = "N/A", "0.00%"
+        else:
+            # 10年期美債的單位是%，顯示上稍作區分
+            if "TNX" in REAL_ESTATE_CONFIG[zh_name] or "10年期" in zh_name:
+                val_str = f"{price_val:.3f}%"
+                delta_str = f"{pct_val:.2f} bps" # 近似基點變動
+            else:
+                val_str = f"{price_val:.2f}"
+                delta_str = f"{pct_val:.2f}%"
+                
+        st.metric(label=display_name, value=val_str, delta=delta_str)
+
+
+if not re_chart_df.empty:
+    st.subheader(T["re_chart"])
+    # 融化 DataFrame 以適應 Plotly 格式
+    # ... (保留你原有的圖表渲染邏輯)
 
 if not re_chart_df.empty:
     st.subheader(T["re_chart"])
