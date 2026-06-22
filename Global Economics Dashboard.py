@@ -836,37 +836,6 @@ def fetch_yield_spread_data(vnq_ticker="VNQ", treasury_ticker="^TNX"):
         print(f"Fetch Yield Spread Error: {e}")
         return 4.2, 4.3 
 
-def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
-    if current_lang == "English":
-        title = "🔍 US Real Estate Risk Premium"
-        label1, label2, label3 = "REITs Yield (VNQ)", "Risk-Free Rate (10Y)", "Risk Premium (Spread)"
-        msg_err = "⚠️ Warning: REITs yield is lower than the risk-free rate! This often signals overvaluation or extreme bond market sell-off."
-        msg_warn = "⚖️ Observation: Risk premium is tightening. REITs attractiveness is waning; proceed with caution."
-        msg_succ = "✅ Healthy: Real Estate still offers a reasonable risk premium. Attractive for allocation."
-    else:
-        title = "🔍 美國房地產風險溢價分析"
-        label1, label2, label3 = "房地產收益率 (VNQ)", "無風險利率 (10Y)", "風險溢價 (Spread)"
-        msg_err = "⚠️ 警示：房地產殖利率低於無風險利率！這通常代表房地產資產估值過高或債市出現極端拋售。"
-        msg_warn = "⚖️ 觀察：風險溢價收窄。房地產的吸引力正在減弱，建議謹慎配置。"
-        msg_succ = "✅ 健康：房地產仍具備合理的風險溢價，資金配置具備吸引力。"
-
-    st.markdown(f"### {title}")
-    
-    vnq_yield, tnx_yield = fetch_yield_spread_data(vnq_ticker, treasury_ticker)
-    spread = vnq_yield - tnx_yield
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric(label1, f"{vnq_yield:.2f}%")
-    col2.metric(label2, f"{tnx_yield:.2f}%")
-    col3.metric(label3, f"{spread:.2f}%")
-    
-    if spread < 0:
-        st.error(msg_err)
-    elif spread < 1.0:
-        st.warning(msg_warn)
-    else:
-        st.success(msg_succ)
-
 def render_re_interpretation_mechanism(re_metrics, current_lang):
     if current_lang == "English":
         label_matrix = "🔮 Market Regime Matrix Signals"
@@ -932,6 +901,37 @@ def render_re_interpretation_mechanism(re_metrics, current_lang):
             for heading, body in triggered_signals:
                 with st.expander(f"{heading}", expanded=True):
                     st.write(body)
+
+def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
+    if current_lang == "English":
+        title = "🔍 US Real Estate Risk Premium"
+        label1, label2, label3 = "REITs Yield (VNQ)", "Risk-Free Rate (10Y)", "Risk Premium (Spread)"
+        msg_err = "⚠️ Warning: REITs yield is lower than the risk-free rate! This often signals overvaluation or extreme bond market sell-off."
+        msg_warn = "⚖️ Observation: Risk premium is tightening. REITs attractiveness is waning; proceed with caution."
+        msg_succ = "✅ Healthy: Real Estate still offers a reasonable risk premium. Attractive for allocation."
+    else:
+        title = "🔍 美國房地產風險溢價分析"
+        label1, label2, label3 = "房地產收益率 (VNQ)", "無風險利率 (10Y)", "風險溢價 (Spread)"
+        msg_err = "⚠️ 警示：房地產殖利率低於無風險利率！這通常代表房地產資產估值過高或債市出現極端拋售。"
+        msg_warn = "⚖️ 觀察：風險溢價收窄。房地產的吸引力正在減弱，建議謹慎配置。"
+        msg_succ = "✅ 健康：房地產仍具備合理的風險溢價，資金配置具備吸引力。"
+
+    st.markdown(f"### {title}")
+    
+    vnq_yield, tnx_yield = fetch_yield_spread_data(vnq_ticker, treasury_ticker)
+    spread = vnq_yield - tnx_yield
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric(label1, f"{vnq_yield:.2f}%")
+    col2.metric(label2, f"{tnx_yield:.2f}%")
+    col3.metric(label3, f"{spread:.2f}%")
+    
+    if spread < 0:
+        st.error(msg_err)
+    elif spread < 1.0:
+        st.warning(msg_warn)
+    else:
+        st.success(msg_succ)
 
 
 # --- 📊 資料讀取與準備區 ---
