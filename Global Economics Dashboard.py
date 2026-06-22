@@ -996,8 +996,89 @@ def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
     else:
         st.success(msg_succ)
 
+# =========================================================
+# 📊 新增：關鍵房地產指標綜合判讀機制
+# =========================================================
+def render_re_interpretation_mechanism(re_metrics, current_lang):
+    if current_lang == "English":
+        title = "🧠 Real Estate Macro Signal Engine"
+        label_matrix = "🔮 Market Regime Matrix Signals"
+        no_signal = "⚪ Market is currently stable; no extreme anomaly signals detected."
+        
+        signals_dict = {
+            "growth_dominant": ("📈 Homebuilders Outperforming REITs (Growth Dominant)", "Market favors cyclical construction and home buying demand. Typical of an economic expansion or strong demographic tails."),
+            "defensive_yield": ("🛡️ REITs Outperforming Homebuilders (Defensive Shift)", "Capital is moving to defensive yield-locking rental properties, cautious of cyclical growth peaks."),
+            "us_strong": ("🇺🇸 US Real Estate Relative Strength", "US economic resilience or a stronger USD is attracting global real estate allocation relative to international markets."),
+            "global_rotation": ("🌍 Global Real Estate Rotation (Ex-US)", "Weaker USD or monetary easing in ex-US regions is driving capital to global real estate."),
+            "credit_stress": ("⚠️ Mortgage REIT (REM) Credit Compression", "Leveraged mortgage REITs are significantly lagging equity REITs. Indicates potential widening credit spreads or high rate volatility."),
+            "rate_shock": ("⚡ Macro Interest Rate Shock", "10Y Treasury yield spiked significantly, placing intense valuation pressure on high-yield and leveraged real estate sectors.")
+        }
+    else:
+        title = "🧠 關鍵房地產指標綜合判讀機制"
+        label_matrix = "🔮 房地產聯動與市場狀態訊號"
+        no_signal = "⚪ 目前市場處於常態波動，未觸發極端異常判讀訊號。"
+        
+        signals_dict = {
+            "growth_dominant": ("📈 建商強於 REITs (增長主導)", "市場目前更看好實體營建與房屋剛性需求。這通常出現在經濟擴張期或強勁的需求景氣循環中。"),
+            "defensive_yield": ("🛡️ REITs 強於建商 (防禦收息)", "資金偏向鎖定穩定的租金收益，而非追求高波動的循環增長，反映市場情緒趨於謹慎。"),
+            "us_strong": ("🇺🇸 美國房市相對強勢", "美國經濟基本面相對非美地區更具韌性，或受惠於強勢美元，吸引國際資金回流美房產。"),
+            "global_rotation": ("🌍 非美房市資金輪動", "美元走弱或非美地區貨幣政策相對寬鬆，帶動全球不含美 (VNQI) 房地產板塊的補漲行情。"),
+            "credit_stress": ("⚠️ 抵押貸 (REM) 信用槓桿壓力", "高槓桿的商業不動產抵押板塊顯著落後實體權益類 REITs，暗示房貸市場波動加劇或信用利差擴大。"),
+            "rate_shock": ("⚡ 總體利率環境震盪", "10年期美債殖利率單日顯著飆升，對高槓桿、高配息特性的房地產板塊形成估值與借貸成本的全面壓制。")
+        }
+
+    st.markdown(f"### {title}")
+    
+    # 安全提取各指標的單日漲跌幅
+    vnq_chg = re_metrics.get("美國房地產 (VNQ)", {}).get("daily_pct", 0.0)
+    vnqi_chg = re_metrics.get("全球不含美房市 (VNQI)", {}).get("daily_pct", 0.0)
+    itb_chg = re_metrics.get("美國房屋建商 (ITB)", {}).get("daily_pct", 0.0)
+    rem_chg = re_metrics.get("商業不動產抵押 (REM)", {}).get("daily_pct", 0.0)
+    tnx_chg = re_metrics.get("10年期美債殖利率", {}).get("daily_pct", 0.0)
+
+    # 處理 NaN 防錯
+    vnq_chg = 0.0 if pd.isna(vnq_chg) else vnq_chg
+    vnqi_chg = 0.0 if pd.isna(vnqi_chg) else vnqi_chg
+    itb_chg = 0.0 if pd.isna(itb_chg) else itb_chg
+    rem_chg = 0.0 if pd.isna(rem_chg) else rem_chg
+    tnx_chg = 0.0 if pd.isna(tnx_chg) else tnx_chg
+
+    triggered_signals = []
+
+    # 1. 判斷 成長 vs 收益 (ITB vs VNQ)
+    if itb_chg > vnq_chg + 0.6:
+        triggered_signals.append(signals_dict["growth_dominant"])
+    elif vnq_chg > itb_chg + 0.6:
+        triggered_signals.append(signals_dict["defensive_yield"])
+
+    # 2. 判斷 美國 vs 全球非美 (VNQ vs VNQI)
+    if vnq_chg > vnqi_chg + 0.4:
+        triggered_signals.append(signals_dict["us_strong"])
+    elif vnqi_chg > vnq_chg + 0.4:
+        triggered_signals.append(signals_dict["global_rotation"])
+
+    # 3. 判斷 信用與槓桿壓力 (REM vs VNQ)
+    if rem_chg < vnq_chg - 0.7:
+        triggered_signals.append(signals_dict["credit_stress"])
+
+    # 4. 判斷 美債殖利率飆升衝擊 (當殖利率大漲，且地產受挫時)
+    if tnx_chg > 1.5 and (vnq_chg < -0.3 or rem_chg < -0.3):
+        triggered_signals.append(signals_dict["rate_shock"])
+
+    # --- UI 渲染展示 ---
+    with st.container(border=True):
+        st.markdown(f"#### {label_matrix}")
+        if not triggered_signals:
+            st.info(no_signal)
+        else:
+            # 使用兩欄或列表排版動態觸發的訊號
+            for heading, body in triggered_signals:
+                with st.expander(f"{heading}", expanded=True):
+                    st.write(body)
+
 # 最後在主程式區塊呼叫
 render_yield_spread(language)
+render_re_interpretation_mechanism(re_metrics, language)
 
 # =========================================================
 # 📰 房地產各大洲專屬 AI 新聞總結
