@@ -887,10 +887,10 @@ def render_re_interpretation_mechanism(re_metrics, current_lang):
     elif vnqi_chg > vnq_chg + 0.8:
         triggered_signals.append(signals_dict["global_rotation"])
 
-    if rem_chg < vnq_chg - 0.7:
+    if rem_chg < vnq_chg - 0.7 and rem_chg < 0:
         triggered_signals.append(signals_dict["credit_stress"])
 
-    if tnx_chg > 2.5 and (vnq_chg < -0.3 or rem_chg < -0.3):
+    if tnx_chg > 2.5 and (vnq_chg < -0.5 or rem_chg < -1.0):
         triggered_signals.append(signals_dict["rate_shock"])
 
     with st.container(border=True):
