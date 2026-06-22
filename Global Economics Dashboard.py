@@ -1031,8 +1031,6 @@ for i, zh_name in enumerate(REAL_ESTATE_CONFIG.keys()):
 # 📌 【已成功上移至此】直接在關鍵房地產指標 Metric 面板下方渲染綜合判讀與風險溢價
 render_re_interpretation_mechanism(re_metrics, language)
 st.markdown("---")
-render_yield_spread(language)
-st.markdown("---")
 
 # 4. 渲染趨勢走勢圖
 if not re_chart_df.empty:
@@ -1055,6 +1053,9 @@ if not re_chart_df.empty:
     
     fig_re.update_xaxes(tickformat="%Y-%m-%d")
     st.plotly_chart(fig_re, use_container_width=True)
+
+st.markdown("---")
+render_yield_spread(language)
 
 # =========================================================
 # 📰 房地產各大洲專屬 AI 新聞總結
