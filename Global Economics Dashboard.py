@@ -1029,9 +1029,9 @@ for i, zh_name in enumerate(REAL_ESTATE_CONFIG.keys()):
         st.metric(label=display_name, value=val_str, delta=delta_str)
 
 # 📌 【已成功上移至此】直接在關鍵房地產指標 Metric 面板下方渲染綜合判讀與風險溢價
+render_re_interpretation_mechanism(re_metrics, language)
 st.markdown("---")
 render_yield_spread(language)
-render_re_interpretation_mechanism(re_metrics, language)
 st.markdown("---")
 
 # 4. 渲染趨勢走勢圖
