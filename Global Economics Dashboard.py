@@ -869,7 +869,6 @@ def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
 
 def render_re_interpretation_mechanism(re_metrics, current_lang):
     if current_lang == "English":
-        title = "🧠 Real Estate Macro Signal Engine"
         label_matrix = "🔮 Market Regime Matrix Signals"
         no_signal = "⚪ Market is currently stable; no extreme anomaly signals detected."
         
@@ -882,7 +881,6 @@ def render_re_interpretation_mechanism(re_metrics, current_lang):
             "rate_shock": ("⚡ Macro Interest Rate Shock", "10Y Treasury yield spiked significantly, placing intense valuation pressure on high-yield and leveraged real estate sectors.")
         }
     else:
-        title = "🧠 關鍵房地產指標綜合判讀機制"
         label_matrix = "🔮 房地產聯動與市場狀態訊號"
         no_signal = "⚪ 目前市場處於常態波動，未觸發極端異常判讀訊號。"
         
@@ -895,7 +893,6 @@ def render_re_interpretation_mechanism(re_metrics, current_lang):
             "rate_shock": ("⚡ 總體利率環境震盪", "10年期美債殖利率單日顯著飆升，對高槓桿、高配息特性的房地產板塊形成估值與借貸成本的全面壓制。")
         }
 
-    st.markdown(f"### {title}")
     
     vnq_chg = re_metrics.get("美國房地產 (VNQ)", {}).get("daily_pct", 0.0)
     vnqi_chg = re_metrics.get("全球不含美房市 (VNQI)", {}).get("daily_pct", 0.0)
