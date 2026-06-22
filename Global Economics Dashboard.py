@@ -807,16 +807,143 @@ fig_map.update_geos(fitbounds="locations", visible=False)
 fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
 st.plotly_chart(fig_map, use_container_width=True)
 
+這裡已經幫你完成 Debug，並將所有函數定義提前（防止 Streamlit 執行順序錯亂），同時將**「美國房地產風險溢價分析」與「關鍵房地產指標綜合判讀機制」二個判讀區塊，精準移到「關鍵房地產指標（Metric 面板）」的下方、趨勢走勢圖的前方**。
+請直接複製以下完整程式碼，替換掉原本的整個房地產宏觀市場模塊：
 # =========================================================
 # 🏢 房地產宏觀市場模塊 (Real Estate Module)
 # =========================================================
 st.markdown("---")
 st.header(T["re_header"])
 
-re_chart_df, re_metrics_cached = fetch_real_estate_data()
-re_metrics = copy.deepcopy(re_metrics_cached) # 避免污染快取
+# --- ⚙️ 函數提前定義區 (防止 Streamlit 順序錯亂與 NameError) ---
 
-# 💡 定義房地產資產的英文字典（供圖表與 Metric 共同使用）
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_yield_spread_data(vnq_ticker="VNQ", treasury_ticker="^TNX"):
+    try:
+        vnq = yf.Ticker(vnq_ticker)
+        tnx = yf.Ticker(treasury_ticker)
+        
+        info = vnq.info
+        raw_yield = info.get('dividendYield', 0.04) 
+        if raw_yield > 1: 
+            raw_yield = raw_yield / 100 
+        
+        vnq_yield = raw_yield * 100
+        
+        tnx_hist = tnx.history(period="5d")
+        tnx_yield = tnx_hist['Close'].iloc[-1] if not tnx_hist.empty else 4.0
+        
+        return vnq_yield, tnx_yield
+    except Exception as e:
+        print(f"Fetch Yield Spread Error: {e}")
+        return 4.2, 4.3 
+
+def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
+    if current_lang == "English":
+        title = "🔍 US Real Estate Risk Premium"
+        label1, label2, label3 = "REITs Yield (VNQ)", "Risk-Free Rate (10Y)", "Risk Premium (Spread)"
+        msg_err = "⚠️ Warning: REITs yield is lower than the risk-free rate! This often signals overvaluation or extreme bond market sell-off."
+        msg_warn = "⚖️ Observation: Risk premium is tightening. REITs attractiveness is waning; proceed with caution."
+        msg_succ = "✅ Healthy: Real Estate still offers a reasonable risk premium. Attractive for allocation."
+    else:
+        title = "🔍 美國房地產風險溢價分析"
+        label1, label2, label3 = "房地產收益率 (VNQ)", "無風險利率 (10Y)", "風險溢價 (Spread)"
+        msg_err = "⚠️ 警示：房地產殖利率低於無風險利率！這通常代表房地產資產估值過高或債市出現極端拋售。"
+        msg_warn = "⚖️ 觀察：風險溢價收窄。房地產的吸引力正在減弱，建議謹慎配置。"
+        msg_succ = "✅ 健康：房地產仍具備合理的風險溢價，資金配置具備吸引力。"
+
+    st.markdown(f"### {title}")
+    
+    vnq_yield, tnx_yield = fetch_yield_spread_data(vnq_ticker, treasury_ticker)
+    spread = vnq_yield - tnx_yield
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric(label1, f"{vnq_yield:.2f}%")
+    col2.metric(label2, f"{tnx_yield:.2f}%")
+    col3.metric(label3, f"{spread:.2f}%")
+    
+    if spread < 0:
+        st.error(msg_err)
+    elif spread < 1.0:
+        st.warning(msg_warn)
+    else:
+        st.success(msg_succ)
+
+def render_re_interpretation_mechanism(re_metrics, current_lang):
+    if current_lang == "English":
+        title = "🧠 Real Estate Macro Signal Engine"
+        label_matrix = "🔮 Market Regime Matrix Signals"
+        no_signal = "⚪ Market is currently stable; no extreme anomaly signals detected."
+        
+        signals_dict = {
+            "growth_dominant": ("📈 Homebuilders Outperforming REITs (Growth Dominant)", "Market favors cyclical construction and home buying demand. Typical of an economic expansion or strong demographic tails."),
+            "defensive_yield": ("🛡️ REITs Outperforming Homebuilders (Defensive Shift)", "Capital is moving to defensive yield-locking rental properties, cautious of cyclical growth peaks."),
+            "us_strong": ("🇺🇸 US Real Estate Relative Strength", "US economic resilience or a stronger USD is attracting global real estate allocation relative to international markets."),
+            "global_rotation": ("🌍 Global Real Estate Rotation (Ex-US)", "Weaker USD or monetary easing in ex-US regions is driving capital to global real estate."),
+            "credit_stress": ("⚠️ Mortgage REIT (REM) Credit Compression", "Leveraged mortgage REITs are significantly lagging equity REITs. Indicates potential widening credit spreads or high rate volatility."),
+            "rate_shock": ("⚡ Macro Interest Rate Shock", "10Y Treasury yield spiked significantly, placing intense valuation pressure on high-yield and leveraged real estate sectors.")
+        }
+    else:
+        title = "🧠 關鍵房地產指標綜合判讀機制"
+        label_matrix = "🔮 房地產聯動與市場狀態訊號"
+        no_signal = "⚪ 目前市場處於常態波動，未觸發極端異常判讀訊號。"
+        
+        signals_dict = {
+            "growth_dominant": ("📈 建商強於 REITs (增長主導)", "市場目前更看好實體營建與房屋剛性需求。這通常出現在經濟擴張期或強勁的需求景氣循環中。"),
+            "defensive_yield": ("🛡️ REITs 強於建商 (防禦收息)", "資金偏向鎖定穩定的租金收益，而非追求高波動的循環增長，反映市場情緒趨於謹慎。"),
+            "us_strong": ("🇺🇸 美國房市相對強勢", "美國經濟基本面相對非美地區更具韌性，或受惠於強勢美元，吸引國際資金回流美房產。"),
+            "global_rotation": ("🌍 非美房市資金輪動", "美元走弱或非美地區貨幣政策相對寬鬆，帶動全球不含美 (VNQI) 房地產板塊的補漲行情。"),
+            "credit_stress": ("⚠️ 抵押貸 (REM) 信用槓桿壓力", "高槓桿的商業不動產抵押板塊顯著落後實體權益類 REITs，暗示房貸市場波動加劇或信用利差擴大。"),
+            "rate_shock": ("⚡ 總體利率環境震盪", "10年期美債殖利率單日顯著飆升，對高槓桿、高配息特性的房地產板塊形成估值與借貸成本的全面壓制。")
+        }
+
+    st.markdown(f"### {title}")
+    
+    vnq_chg = re_metrics.get("美國房地產 (VNQ)", {}).get("daily_pct", 0.0)
+    vnqi_chg = re_metrics.get("全球不含美房市 (VNQI)", {}).get("daily_pct", 0.0)
+    itb_chg = re_metrics.get("美國房屋建商 (ITB)", {}).get("daily_pct", 0.0)
+    rem_chg = re_metrics.get("商業不動產抵押 (REM)", {}).get("daily_pct", 0.0)
+    tnx_chg = re_metrics.get("10年期美債殖利率", {}).get("daily_pct", 0.0)
+
+    vnq_chg = 0.0 if pd.isna(vnq_chg) else vnq_chg
+    vnqi_chg = 0.0 if pd.isna(vnqi_chg) else vnqi_chg
+    itb_chg = 0.0 if pd.isna(itb_chg) else itb_chg
+    rem_chg = 0.0 if pd.isna(rem_chg) else rem_chg
+    tnx_chg = 0.0 if pd.isna(tnx_chg) else tnx_chg
+
+    triggered_signals = []
+
+    if itb_chg > vnq_chg + 0.6:
+        triggered_signals.append(signals_dict["growth_dominant"])
+    elif vnq_chg > itb_chg + 0.6:
+        triggered_signals.append(signals_dict["defensive_yield"])
+
+    if vnq_chg > vnqi_chg + 0.4:
+        triggered_signals.append(signals_dict["us_strong"])
+    elif vnqi_chg > vnq_chg + 0.4:
+        triggered_signals.append(signals_dict["global_rotation"])
+
+    if rem_chg < vnq_chg - 0.7:
+        triggered_signals.append(signals_dict["credit_stress"])
+
+    if tnx_chg > 1.5 and (vnq_chg < -0.3 or rem_chg < -0.3):
+        triggered_signals.append(signals_dict["rate_shock"])
+
+    with st.container(border=True):
+        st.markdown(f"#### {label_matrix}")
+        if not triggered_signals:
+            st.info(no_signal)
+        else:
+            for heading, body in triggered_signals:
+                with st.expander(f"{heading}", expanded=True):
+                    st.write(body)
+
+
+# --- 📊 資料讀取與準備區 ---
+
+re_chart_df, re_metrics_cached = fetch_real_estate_data()
+re_metrics = copy.deepcopy(re_metrics_cached) 
+
 re_name_map_en = {
     "美國房地產 (VNQ)": "US Real Estate (VNQ)",
     "全球不含美房市 (VNQI)": "Global ex-US RE (VNQI)",
@@ -827,12 +954,11 @@ re_name_map_en = {
 
 st.subheader(T["re_metrics"])
 
-# 1. 確保所有指標都在字典中，若因抓不到導致缺失，則補上 NaN
+# 1. 確保所有指標與覆蓋資料整合
 for zh_name in REAL_ESTATE_CONFIG.keys():
     if zh_name not in re_metrics:
         re_metrics[zh_name] = {"price": np.nan, "daily_pct": np.nan}
         
-    # 如果是 NaN 且之前有手動存過的值，就進行替換
     if pd.isna(re_metrics[zh_name].get("price")) and zh_name in overrides:
         saved_item = overrides[zh_name]
         if isinstance(saved_item, dict):
@@ -842,7 +968,7 @@ for zh_name in REAL_ESTATE_CONFIG.keys():
             re_metrics[zh_name]["price"] = saved_item
             re_metrics[zh_name]["daily_pct"] = 0.0
 
-# 2. 【管理員專屬介面】：房地產指標手動輸入區
+# 2. 【管理員專屬介面】
 if st.session_state.is_admin:
     st.markdown("---")
     st.warning("🛠️ **房地產後台管理區**：以下指標目前從 Yahoo Finance 抓不到資料，請手動輸入補齊")
@@ -873,7 +999,6 @@ if st.session_state.is_admin:
                     format="%.2f"
                 )
             
-            # 存入跟上面全球指標相同的資料結構 (val / delta)
             new_overrides_re[zh_name] = {"val": input_val, "delta": input_delta}
     
     if re_needs_save:
@@ -896,29 +1021,32 @@ for i, zh_name in enumerate(REAL_ESTATE_CONFIG.keys()):
         price_val = data.get('price')
         pct_val = data.get('daily_pct', 0.0)
         
-        # 若最後還是 NaN（還沒手動填過），顯示 N/A
         if pd.isna(price_val) or price_val is None:
             val_str, delta_str = "N/A", "0.00%"
         else:
-            # 10年期美債的單位是%，顯示上稍作區分
             if "TNX" in REAL_ESTATE_CONFIG[zh_name] or "10年期" in zh_name:
                 val_str = f"{price_val:.3f}%"
-                delta_str = f"{pct_val:.2f} bps" # 近似基點變動
+                delta_str = f"{pct_val:.2f} bps" 
             else:
                 val_str = f"{price_val:.2f}"
                 delta_str = f"{pct_val:.2f}%"
                 
         st.metric(label=display_name, value=val_str, delta=delta_str)
 
+# 📌 【已成功上移至此】直接在關鍵房地產指標 Metric 面板下方渲染綜合判讀與風險溢價
+st.markdown("---")
+render_yield_spread(language)
+render_re_interpretation_mechanism(re_metrics, language)
+st.markdown("---")
+
+# 4. 渲染趨勢走勢圖
 if not re_chart_df.empty:
     st.subheader(T["re_chart"])
-    # 融化 DataFrame 以適應 Plotly 格式
     df_melted = re_chart_df.melt(id_vars=["Date"], var_name="Asset", value_name="Normalized Performance (Base=100)")
     
     if language == "English":
         df_melted["Asset"] = df_melted["Asset"].map(lambda x: re_name_map_en.get(x, x))
         
-    # 📌 移除潛在報錯風險的 hover_data 自訂語法，改用乾淨流暢的預設 px.line
     fig_re = px.line(
         df_melted, x="Date", y="Normalized Performance (Base=100)", color="Asset"
     )
@@ -930,153 +1058,8 @@ if not re_chart_df.empty:
         height=400
     )
     
-    # 📌 透過 update_xaxes 確保 X 軸時間顯示格式漂亮且客製化
     fig_re.update_xaxes(tickformat="%Y-%m-%d")
     st.plotly_chart(fig_re, use_container_width=True)
-
-
-# --- 🛡️ 核心防錯：獨立出獲取殖利率的快取函數，ttl 設定 1 小時 ---
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_yield_spread_data(vnq_ticker="VNQ", treasury_ticker="^TNX"):
-    try:
-        vnq = yf.Ticker(vnq_ticker)
-        tnx = yf.Ticker(treasury_ticker)
-        
-        # 透過快取隔離 info 呼叫，徹底封鎖 YFRateLimitError
-        info = vnq.info
-        raw_yield = info.get('dividendYield', 0.04) 
-        if raw_yield > 1: 
-            raw_yield = raw_yield / 100 
-        
-        vnq_yield = raw_yield * 100
-        
-        # 獲取美債最新收盤價
-        tnx_hist = tnx.history(period="5d")
-        tnx_yield = tnx_hist['Close'].iloc[-1] if not tnx_hist.empty else 4.0
-        
-        return vnq_yield, tnx_yield
-    except Exception as e:
-        print(f"Fetch Yield Spread Error: {e}")
-        # 如果 yfinance 暫時抽風，提供一組合理的市場預設值防崩潰
-        return 4.2, 4.3 
-
-
-def render_yield_spread(current_lang, vnq_ticker="VNQ", treasury_ticker="^TNX"):
-    # 設定標題語系
-    if current_lang == "English":
-        title = "🔍 US Real Estate Risk Premium"
-        label1, label2, label3 = "REITs Yield (VNQ)", "Risk-Free Rate (10Y)", "Risk Premium (Spread)"
-        msg_err = "⚠️ Warning: REITs yield is lower than the risk-free rate! This often signals overvaluation or extreme bond market sell-off."
-        msg_warn = "⚖️ Observation: Risk premium is tightening. REITs attractiveness is waning; proceed with caution."
-        msg_succ = "✅ Healthy: Real Estate still offers a reasonable risk premium. Attractive for allocation."
-    else:
-        title = "🔍 美國房地產風險溢價分析"
-        label1, label2, label3 = "房地產收益率 (VNQ)", "無風險利率 (10Y)", "風險溢價 (Spread)"
-        msg_err = "⚠️ 警示：房地產殖利率低於無風險利率！這通常代表房地產資產估值過高或債市出現極端拋售。"
-        msg_warn = "⚖️ 觀察：風險溢價收窄。房地產的吸引力正在減弱，建議謹慎配置。"
-        msg_succ = "✅ 健康：房地產仍具備合理的風險溢價，資金配置具備吸引力。"
-
-    st.markdown(f"### {title}")
-    
-    # 🚀 從剛剛定義的快取函數撈數據，安全、乾淨、不踩雷
-    vnq_yield, tnx_yield = fetch_yield_spread_data(vnq_ticker, treasury_ticker)
-    spread = vnq_yield - tnx_yield
-    
-    # 顯示指標
-    col1, col2, col3 = st.columns(3)
-    col1.metric(label1, f"{vnq_yield:.2f}%")
-    col2.metric(label2, f"{tnx_yield:.2f}%")
-    col3.metric(label3, f"{spread:.2f}%")
-    
-    # 顯示評論
-    if spread < 0:
-        st.error(msg_err)
-    elif spread < 1.0:
-        st.warning(msg_warn)
-    else:
-        st.success(msg_succ)
-
-# =========================================================
-# 📊 新增：關鍵房地產指標綜合判讀機制
-# =========================================================
-def render_re_interpretation_mechanism(re_metrics, current_lang):
-    if current_lang == "English":
-        label_matrix = "🔮 Market Regime Matrix Signals"
-        no_signal = "⚪ Market is currently stable; no extreme anomaly signals detected."
-        
-        signals_dict = {
-            "growth_dominant": ("📈 Homebuilders Outperforming REITs (Growth Dominant)", "Market favors cyclical construction and home buying demand. Typical of an economic expansion or strong demographic tails."),
-            "defensive_yield": ("🛡️ REITs Outperforming Homebuilders (Defensive Shift)", "Capital is moving to defensive yield-locking rental properties, cautious of cyclical growth peaks."),
-            "us_strong": ("🇺🇸 US Real Estate Relative Strength", "US economic resilience or a stronger USD is attracting global real estate allocation relative to international markets."),
-            "global_rotation": ("🌍 Global Real Estate Rotation (Ex-US)", "Weaker USD or monetary easing in ex-US regions is driving capital to global real estate."),
-            "credit_stress": ("⚠️ Mortgage REIT (REM) Credit Compression", "Leveraged mortgage REITs are significantly lagging equity REITs. Indicates potential widening credit spreads or high rate volatility."),
-            "rate_shock": ("⚡ Macro Interest Rate Shock", "10Y Treasury yield spiked significantly, placing intense valuation pressure on high-yield and leveraged real estate sectors.")
-        }
-    else:
-        label_matrix = "🔮 房地產聯動與市場狀態訊號"
-        no_signal = "⚪ 目前市場處於常態波動，未觸發極端異常判讀訊號。"
-        
-        signals_dict = {
-            "growth_dominant": ("📈 建商強於 REITs (增長主導)", "市場目前更看好實體營建與房屋剛性需求。這通常出現在經濟擴張期或強勁的需求景氣循環中。"),
-            "defensive_yield": ("🛡️ REITs 強於建商 (防禦收息)", "資金偏向鎖定穩定的租金收益，而非追求高波動的循環增長，反映市場情緒趨於謹慎。"),
-            "us_strong": ("🇺🇸 美國房市相對強勢", "美國經濟基本面相對非美地區更具韌性，或受惠於強勢美元，吸引國際資金回流美房產。"),
-            "global_rotation": ("🌍 非美房市資金輪動", "美元走弱或非美地區貨幣政策相對寬鬆，帶動全球不含美 (VNQI) 房地產板塊的補漲行情。"),
-            "credit_stress": ("⚠️ 抵押貸 (REM) 信用槓桿壓力", "高槓桿的商業不動產抵押板塊顯著落後實體權益類 REITs，暗示房貸市場波動加劇或信用利差擴大。"),
-            "rate_shock": ("⚡ 總體利率環境震盪", "10年期美債殖利率單日顯著飆升，對高槓桿、高配息特性的房地產板塊形成估值與借貸成本的全面壓制。")
-        }
-
-    st.markdown(f"### {title}")
-    
-    # 安全提取各指標的單日漲跌幅
-    vnq_chg = re_metrics.get("美國房地產 (VNQ)", {}).get("daily_pct", 0.0)
-    vnqi_chg = re_metrics.get("全球不含美房市 (VNQI)", {}).get("daily_pct", 0.0)
-    itb_chg = re_metrics.get("美國房屋建商 (ITB)", {}).get("daily_pct", 0.0)
-    rem_chg = re_metrics.get("商業不動產抵押 (REM)", {}).get("daily_pct", 0.0)
-    tnx_chg = re_metrics.get("10年期美債殖利率", {}).get("daily_pct", 0.0)
-
-    # 處理 NaN 防錯
-    vnq_chg = 0.0 if pd.isna(vnq_chg) else vnq_chg
-    vnqi_chg = 0.0 if pd.isna(vnqi_chg) else vnqi_chg
-    itb_chg = 0.0 if pd.isna(itb_chg) else itb_chg
-    rem_chg = 0.0 if pd.isna(rem_chg) else rem_chg
-    tnx_chg = 0.0 if pd.isna(tnx_chg) else tnx_chg
-
-    triggered_signals = []
-
-    # 1. 判斷 成長 vs 收益 (ITB vs VNQ)
-    if itb_chg > vnq_chg + 0.6:
-        triggered_signals.append(signals_dict["growth_dominant"])
-    elif vnq_chg > itb_chg + 0.6:
-        triggered_signals.append(signals_dict["defensive_yield"])
-
-    # 2. 判斷 美國 vs 全球非美 (VNQ vs VNQI)
-    if vnq_chg > vnqi_chg + 0.4:
-        triggered_signals.append(signals_dict["us_strong"])
-    elif vnqi_chg > vnq_chg + 0.4:
-        triggered_signals.append(signals_dict["global_rotation"])
-
-    # 3. 判斷 信用與槓桿壓力 (REM vs VNQ)
-    if rem_chg < vnq_chg - 0.7:
-        triggered_signals.append(signals_dict["credit_stress"])
-
-    # 4. 判斷 美債殖利率飆升衝擊 (當殖利率大漲，且地產受挫時)
-    if tnx_chg > 1.5 and (vnq_chg < -0.3 or rem_chg < -0.3):
-        triggered_signals.append(signals_dict["rate_shock"])
-
-    # --- UI 渲染展示 ---
-    with st.container(border=True):
-        st.markdown(f"#### {label_matrix}")
-        if not triggered_signals:
-            st.info(no_signal)
-        else:
-            # 使用兩欄或列表排版動態觸發的訊號
-            for heading, body in triggered_signals:
-                with st.expander(f"{heading}", expanded=True):
-                    st.write(body)
-
-# 最後在主程式區塊呼叫
-render_yield_spread(language)
-render_re_interpretation_mechanism(re_metrics, language)
 
 # =========================================================
 # 📰 房地產各大洲專屬 AI 新聞總結
