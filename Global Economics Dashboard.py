@@ -807,8 +807,6 @@ fig_map.update_geos(fitbounds="locations", visible=False)
 fig_map.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0}, height=500)
 st.plotly_chart(fig_map, use_container_width=True)
 
-這裡已經幫你完成 Debug，並將所有函數定義提前（防止 Streamlit 執行順序錯亂），同時將**「美國房地產風險溢價分析」與「關鍵房地產指標綜合判讀機制」二個判讀區塊，精準移到「關鍵房地產指標（Metric 面板）」的下方、趨勢走勢圖的前方**。
-請直接複製以下完整程式碼，替換掉原本的整個房地產宏觀市場模塊：
 # =========================================================
 # 🏢 房地產宏觀市場模塊 (Real Estate Module)
 # =========================================================
