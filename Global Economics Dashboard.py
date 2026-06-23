@@ -1021,7 +1021,7 @@ for i, zh_name in enumerate(REAL_ESTATE_CONFIG.keys()):
         else:
             if "TNX" in REAL_ESTATE_CONFIG[zh_name] or "10年期" in zh_name:
                 val_str = f"{price_val:.3f}%"
-                delta_str = f"{pct_val:.2f} bps" 
+                delta_str = f"{pct_val:.2f}%" 
             else:
                 val_str = f"{price_val:.2f}"
                 delta_str = f"{pct_val:.2f}%"
